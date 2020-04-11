@@ -1,0 +1,31 @@
+[package]
+name = "hierarchical_hash_wheel_timer"
+version = "0.1.0"
+authors = ["Lars Kroll <bathtor@googlemail.com>"]
+edition = "2018"
+description = "A low-level timer implementantion using a hierarchical four-level hash wheel with overflow."
+documentation = "https://docs.rs/hierarchical_hash_wheel_timer"
+homepage = "https://github.com/Bathtor/rust-hash-wheel-timer"
+repository = "https://github.com/Bathtor/rust-hash-wheel-timer"
+readme = "README.md"
+keywords = ["timer", "timeout"]
+categories = ["data-structures", "simulation"]
+license = "MIT"
+
+[features]
+default = ["uuid-extras"]
+uuid-extras = ["uuid"]
+
+[dependencies]
+uuid = { version = "0.8", features = ["v4"] , optional = true}
+
+#[dev-dependencies]
+#uuid = { version = "0.8", features = ["v4"] }
+
+[badges]
+# Maintenance: `status` is required Available options are `actively-developed`,
+# `passively-maintained`, `as-is`, `none`, `experimental`, `looking-for-maintainer`
+# and `deprecated`.
+maintenance = { status = "actively-developed" }
+
+travis-ci = { repository = "Bathtor/rust-hash-wheel-timer", branch = "master" }
