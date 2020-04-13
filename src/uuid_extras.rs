@@ -1,7 +1,4 @@
-use crate::{
-    timers::*,
-    wheels::{CancellableTimerEntry, TimerEntryWithDelay},
-};
+use crate::wheels::{CancellableTimerEntry, TimerEntryWithDelay};
 use std::time::Duration;
 use uuid::Uuid;
 

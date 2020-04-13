@@ -29,3 +29,12 @@ uuid = { version = "0.8", features = ["v4"] , optional = true}
 maintenance = { status = "actively-developed" }
 
 travis-ci = { repository = "Bathtor/rust-hash-wheel-timer", branch = "master" }
+
+[dev-dependencies]
+criterion = "0.3"
+rand = "0.7"
+rand_xoshiro = "0.4"
+
+[[bench]]
+name = "wheel_benchmark"
+harness = false
