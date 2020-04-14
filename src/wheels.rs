@@ -1,8 +1,9 @@
 use super::*;
 use arr_macro::arr;
+#[cfg(feature = "fnv")]
+use fnv::FnvHashMap;
 use std::{
     cmp::Eq,
-    collections::HashMap,
     convert::Infallible,
     fmt::Debug,
     hash::Hash,
@@ -11,6 +12,9 @@ use std::{
     time::Duration,
     u32,
 };
+
+#[cfg(not(feature = "fnv"))]
+use std::collections::HashMap;
 
 // trait TimeWheel<IndexType> {
 //     fn tick(&mut self, results: &mut TimerList) -> IndexType;
@@ -116,6 +120,9 @@ where
     tertiary: ByteWheel<EntryType, [u8; 2]>,
     quarternary: ByteWheel<EntryType, [u8; 3]>,
     overflow: Vec<OverflowEntry<EntryType>>,
+    #[cfg(feature = "fnv")]
+    timers: FnvHashMap<EntryType::Id, Rc<EntryType>>,
+    #[cfg(not(feature = "fnv"))]
     timers: HashMap<EntryType::Id, Rc<EntryType>>,
 }
 
@@ -159,6 +166,9 @@ where
             tertiary: ByteWheel::new(),
             quarternary: ByteWheel::new(),
             overflow: Vec::new(),
+            #[cfg(feature = "fnv")]
+            timers: FnvHashMap::default(),
+            #[cfg(not(feature = "fnv"))]
             timers: HashMap::new(),
         }
     }
@@ -461,9 +471,9 @@ impl Skip {
 
 #[cfg(feature = "uuid-extras")]
 #[cfg(test)]
-mod tests {
+mod uuid_tests {
     use super::*;
-    use crate::IdOnlyTimerEntry;
+    use crate::UuidOnlyTimerEntry;
     use uuid::Uuid;
 
     #[test]
@@ -486,7 +496,7 @@ mod tests {
         let mut timer = QuadWheelWithOverflow::new();
         let id = Uuid::new_v4();
         timer
-            .insert(IdOnlyTimerEntry {
+            .insert(UuidOnlyTimerEntry {
                 id,
                 delay: Duration::from_millis(1),
             })
@@ -501,7 +511,7 @@ mod tests {
         let mut timer = QuadWheelWithOverflow::new();
         let id = Uuid::new_v4();
         timer
-            .insert(IdOnlyTimerEntry {
+            .insert(UuidOnlyTimerEntry {
                 id,
                 delay: Duration::from_millis(1),
             })
@@ -515,7 +525,7 @@ mod tests {
     fn single_ms_reschedule() {
         let mut timer = QuadWheelWithOverflow::new();
         let id = Uuid::new_v4();
-        let entry = IdOnlyTimerEntry {
+        let entry = UuidOnlyTimerEntry {
             id,
             delay: Duration::from_millis(1),
         };
@@ -540,7 +550,7 @@ mod tests {
             let timeout: u64 = 1 << i;
             let id = Uuid::new_v4();
             ids[i] = id;
-            let entry = IdOnlyTimerEntry {
+            let entry = UuidOnlyTimerEntry {
                 id,
                 delay: Duration::from_millis(timeout),
             };
@@ -574,7 +584,7 @@ mod tests {
             let timeout: u64 = 1 << i;
             let id = Uuid::new_v4();
             ids[i] = id;
-            let entry = IdOnlyTimerEntry {
+            let entry = UuidOnlyTimerEntry {
                 id,
                 delay: Duration::from_millis(timeout),
             };
@@ -606,6 +616,191 @@ mod tests {
             let timeout: u64 = 1 << i;
             timeouts[i] = timeout as u128;
             let id = Uuid::new_v4();
+            ids[i] = id;
+            let entry = UuidOnlyTimerEntry {
+                id,
+                delay: Duration::from_millis(timeout),
+            };
+            timer.insert(entry).expect("Could not insert timer entry!");
+            println!("Added timeout at index={} with time={}", i, timeout);
+        }
+        let mut index = 0usize;
+        let mut millis = 0u128;
+        while index < 33 {
+            match timer.can_skip() {
+                Skip::Empty => panic!(
+                    "Timer ran empty with index={} and millis={}!",
+                    index, millis
+                ),
+                Skip::Millis(skip) => {
+                    timer.skip(skip);
+                    millis += skip as u128;
+                    println!("Skipped {}ms to {}", skip, millis);
+                }
+                Skip::None => (),
+            }
+            let mut res = timer.tick();
+            millis += 1u128;
+            //println!("Ticked to {}", millis);
+            if !res.is_empty() {
+                let entry = res.pop().unwrap();
+                assert_eq!(entry.id(), &ids[index]);
+                assert_eq!(millis, timeouts[index]);
+                println!("Handled timeout {} at {}ms", index, millis);
+                index += 1usize;
+            } else {
+                () // ignore empty ticks, which must be done do advance within a wheel
+                   //println!("Empty tick at {}ms", millis);
+            }
+        }
+        assert_eq!(timer.can_skip(), Skip::Empty);
+    }
+}
+
+#[cfg(test)]
+mod u64_tests {
+    use super::*;
+
+    #[test]
+    fn single_schedule_fail() {
+        let mut timer = QuadWheelWithOverflow::new();
+        let id = 1u64;
+        let res = timer.insert(IdOnlyTimerEntry {
+            id,
+            delay: Duration::from_millis(0),
+        });
+        assert!(res.is_err());
+        match res {
+            Err(TimerError::Expired(e)) => assert_eq!(e.id(), &id),
+            _ => panic!("Unexpected result {:?}", res),
+        }
+    }
+
+    #[test]
+    fn single_ms_schedule() {
+        let mut timer = QuadWheelWithOverflow::new();
+        let id = 1u64;
+        timer
+            .insert(IdOnlyTimerEntry {
+                id,
+                delay: Duration::from_millis(1),
+            })
+            .expect("Could not insert timer entry!");
+        let res = timer.tick();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].id(), &id);
+    }
+
+    #[test]
+    fn single_ms_cancel() {
+        let mut timer = QuadWheelWithOverflow::new();
+        let id = 1u64;
+        timer
+            .insert(IdOnlyTimerEntry {
+                id,
+                delay: Duration::from_millis(1),
+            })
+            .expect("Could not insert timer entry!");
+        timer.cancel(&id).expect("Entry could not be cancelled!");
+        let res = timer.tick();
+        assert_eq!(res.len(), 0);
+    }
+
+    #[test]
+    fn single_ms_reschedule() {
+        let mut timer = QuadWheelWithOverflow::new();
+        let id = 1u64;
+        let entry = IdOnlyTimerEntry {
+            id,
+            delay: Duration::from_millis(1),
+        };
+
+        timer.insert(entry).expect("Could not insert timer entry!");
+        for _ in 0..1000 {
+            let mut res = timer.tick();
+            assert_eq!(res.len(), 1);
+            let entry = res.pop().unwrap();
+            assert_eq!(entry.id(), &id);
+            timer
+                .insert_ref(entry)
+                .expect("Could not insert timer entry!");
+        }
+    }
+
+    #[test]
+    fn increasing_schedule_no_overflow() {
+        let mut timer = QuadWheelWithOverflow::new();
+        let mut ids: [u64; 25] = [0; 25];
+        for i in 0..=24 {
+            let timeout: u64 = 1 << i;
+            let id = i as u64;
+            ids[i] = id;
+            let entry = IdOnlyTimerEntry {
+                id,
+                delay: Duration::from_millis(timeout),
+            };
+            timer.insert(entry).expect("Could not insert timer entry!");
+        }
+        //let mut tick_counter = 0u128;
+        for i in 0..=24 {
+            let target: u64 = 1 << i;
+            let prev: u64 = if i == 0 { 0 } else { 1 << (i - 1) };
+            println!("target={} and prev={}", target, prev);
+            for _ in (prev + 1)..target {
+                let res = timer.tick();
+                //tick_counter += 1;
+                //println!("Ticked to {}", tick_counter);
+                assert_eq!(res.len(), 0);
+            }
+            let mut res = timer.tick();
+            //tick_counter += 1;
+            //println!("Ticked to {}", tick_counter);
+            assert_eq!(res.len(), 1);
+            let entry = res.pop().unwrap();
+            assert_eq!(entry.id(), &ids[i]);
+        }
+    }
+
+    #[test]
+    fn increasing_schedule_overflow() {
+        let mut timer = QuadWheelWithOverflow::new();
+        let mut ids: [u64; 33] = [0; 33];
+        for i in 0..=32 {
+            let timeout: u64 = 1 << i;
+            let id = i as u64;
+            ids[i] = id;
+            let entry = IdOnlyTimerEntry {
+                id,
+                delay: Duration::from_millis(timeout),
+            };
+            timer.insert(entry).expect("Could not insert timer entry!");
+        }
+        //let mut tick_counter = 0u128;
+        for i in 0..=32 {
+            let target: u64 = 1 << i;
+            let prev: u64 = if i == 0 { 0 } else { 1 << (i - 1) };
+            println!("target={} (2^{}) and prev={}", target, i, prev);
+            let diff = (target - prev - 1) as u32;
+            timer.skip(diff);
+            let mut res = timer.tick();
+            //tick_counter += 1;
+            //println!("Ticked to {}", tick_counter);
+            //println!("In slot {} got {} expected {}", target, res.len(), 1);
+            assert_eq!(res.len(), 1);
+            let entry = res.pop().unwrap();
+            assert_eq!(entry.id(), &ids[i]);
+        }
+    }
+
+    #[test]
+    fn increasing_skip() {
+        let mut timer = QuadWheelWithOverflow::new();
+        let mut ids: [u64; 33] = [0; 33];
+        let mut timeouts: [u128; 33] = [0; 33];
+        for i in 0..=32 {
+            let timeout: u64 = 1 << i;
+            timeouts[i] = timeout as u128;
+            let id = i as u64;
             ids[i] = id;
             let entry = IdOnlyTimerEntry {
                 id,

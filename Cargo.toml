@@ -13,12 +13,13 @@ categories = ["data-structures", "simulation"]
 license = "MIT"
 
 [features]
-default = ["uuid-extras"]
+default = ["uuid-extras", "fnv"]
 uuid-extras = ["uuid"]
 
 [dependencies]
 uuid = { version = "0.8", features = ["v4"] , optional = true}
 arr_macro = "0.1"
+fnv = { version = "1.0", optional = true}
 
 #[dev-dependencies]
 #uuid = { version = "0.8", features = ["v4"] }

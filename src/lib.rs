@@ -1,5 +1,9 @@
+use std::{hash::Hash, time::Duration};
+
 pub mod simulation;
 pub mod wheels;
+
+use wheels::{CancellableTimerEntry, TimerEntryWithDelay};
 
 mod timers;
 pub use self::timers::*;
@@ -16,6 +20,36 @@ pub enum TimerError<EntryType> {
     NotFound,
     /// The timout has already expired
     Expired(EntryType),
+}
+
+#[derive(Debug)]
+pub struct IdOnlyTimerEntry<I> {
+    pub id: I,
+    pub delay: Duration,
+}
+impl<I> IdOnlyTimerEntry<I> {
+    pub fn new(id: I, delay: Duration) -> Self {
+        IdOnlyTimerEntry { id, delay }
+    }
+}
+impl<I> CancellableTimerEntry for IdOnlyTimerEntry<I>
+where
+    I: Hash + Clone + Eq + std::fmt::Debug,
+{
+    type Id = I;
+
+    fn id(&self) -> &Self::Id {
+        &self.id
+    }
+}
+
+impl<I> TimerEntryWithDelay for IdOnlyTimerEntry<I>
+where
+    I: Hash + Clone + Eq + std::fmt::Debug,
+{
+    fn delay(&self) -> Duration {
+        self.delay
+    }
 }
 
 #[cfg(test)]
