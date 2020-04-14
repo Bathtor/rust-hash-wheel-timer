@@ -1,4 +1,5 @@
 use super::*;
+use arr_macro::arr;
 use std::{
     cmp::Eq,
     collections::HashMap,
@@ -38,15 +39,14 @@ struct WheelEntry<EntryType, RestType> {
 type WheelEntryList<EntryType, RestType> = Vec<WheelEntry<EntryType, RestType>>;
 
 struct ByteWheel<EntryType, RestType> {
-    slots: [Option<Box<WheelEntryList<EntryType, RestType>>>; 256],
+    slots: [Option<WheelEntryList<EntryType, RestType>>; 256],
     count: u64,
     current: u8,
 }
 
 impl<EntryType, RestType> ByteWheel<EntryType, RestType> {
     fn new() -> Self {
-        let slots: [Option<Box<WheelEntryList<EntryType, RestType>>>; 256] =
-            unsafe { mem::transmute([0usize; 256]) };
+        let slots: [Option<WheelEntryList<EntryType, RestType>>; 256] = arr![Option::None; 256];
         ByteWheel {
             slots,
             count: 0,
@@ -59,7 +59,7 @@ impl<EntryType, RestType> ByteWheel<EntryType, RestType> {
         let we = WheelEntry { entry: e, rest: r };
         if self.slots[index].is_none() {
             let l = Vec::new();
-            let bl = Some(Box::new(l));
+            let bl = Some(l);
             self.slots[index] = bl;
         }
         if let Some(ref mut l) = &mut self.slots[index] {

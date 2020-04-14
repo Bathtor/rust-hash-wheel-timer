@@ -18,6 +18,7 @@ uuid-extras = ["uuid"]
 
 [dependencies]
 uuid = { version = "0.8", features = ["v4"] , optional = true}
+arr_macro = "0.1"
 
 #[dev-dependencies]
 #uuid = { version = "0.8", features = ["v4"] }
