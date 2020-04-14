@@ -7,7 +7,7 @@ use criterion::{
     Criterion,
     Throughput,
 };
-use hierarchical_hash_wheel_timer::{wheels::*, IdOnlyTimerEntry};
+use hierarchical_hash_wheel_timer::{wheels::*, UuidOnlyTimerEntry};
 use rand::prelude::*;
 use std::{rc::Rc, time::Duration};
 use uuid::Uuid;
@@ -33,11 +33,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 fn write_only_dense_bench(bencher: &mut Bencher) -> () {
     bencher.iter_batched(
         || {
-            let timer: QuadWheelWithOverflow<IdOnlyTimerEntry> = QuadWheelWithOverflow::new();
+            let timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
             let mut entries = Vec::with_capacity(NUM_ELEMENTS);
             for i in 1..=NUM_ELEMENTS {
                 let id = Uuid::new_v4();
-                let entry = IdOnlyTimerEntry {
+                let entry = UuidOnlyTimerEntry {
                     id,
                     delay: Duration::from_millis(i as u64),
                 };
@@ -59,7 +59,7 @@ fn write_only_dense_bench(bencher: &mut Bencher) -> () {
 fn write_only_uniform_bench(bencher: &mut Bencher) -> () {
     bencher.iter_batched(
         || {
-            let timer: QuadWheelWithOverflow<IdOnlyTimerEntry> = QuadWheelWithOverflow::new();
+            let timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
             let mut entries = Vec::with_capacity(NUM_ELEMENTS);
             let mut rng = rand_xoshiro::Xoshiro256PlusPlus::seed_from_u64(42);
             for _i in 1..=NUM_ELEMENTS {
@@ -69,7 +69,7 @@ fn write_only_uniform_bench(bencher: &mut Bencher) -> () {
                     // make sure the entry is actually inserted and not just returned immediately
                     delay = 1;
                 }
-                let entry = IdOnlyTimerEntry {
+                let entry = UuidOnlyTimerEntry {
                     id,
                     delay: Duration::from_millis(delay as u64),
                 };
@@ -91,7 +91,7 @@ fn write_only_uniform_bench(bencher: &mut Bencher) -> () {
 fn write_only_uniform_with_overflow_bench(bencher: &mut Bencher) -> () {
     bencher.iter_batched(
         || {
-            let timer: QuadWheelWithOverflow<IdOnlyTimerEntry> = QuadWheelWithOverflow::new();
+            let timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
             let mut entries = Vec::with_capacity(NUM_ELEMENTS);
             let mut rng = rand_xoshiro::Xoshiro256PlusPlus::seed_from_u64(42);
             for _i in 1..=NUM_ELEMENTS {
@@ -101,7 +101,7 @@ fn write_only_uniform_with_overflow_bench(bencher: &mut Bencher) -> () {
                     // make sure the entry is actually inserted and not just returned immediately
                     delay = 1;
                 }
-                let entry = IdOnlyTimerEntry {
+                let entry = UuidOnlyTimerEntry {
                     id,
                     delay: Duration::from_millis(delay),
                 };
@@ -123,11 +123,11 @@ fn write_only_uniform_with_overflow_bench(bencher: &mut Bencher) -> () {
 fn write_only_single_bench(bencher: &mut Bencher) -> () {
     bencher.iter_batched(
         || {
-            let timer: QuadWheelWithOverflow<IdOnlyTimerEntry> = QuadWheelWithOverflow::new();
+            let timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
             let mut entries = Vec::with_capacity(NUM_ELEMENTS);
             for _i in 1..=NUM_ELEMENTS {
                 let id = Uuid::new_v4();
-                let entry = IdOnlyTimerEntry {
+                let entry = UuidOnlyTimerEntry {
                     id,
                     delay: Duration::from_millis(1),
                 };
@@ -149,10 +149,10 @@ fn write_only_single_bench(bencher: &mut Bencher) -> () {
 fn read_only_bench(bencher: &mut Bencher) -> () {
     bencher.iter_batched(
         || {
-            let mut timer: QuadWheelWithOverflow<IdOnlyTimerEntry> = QuadWheelWithOverflow::new();
+            let mut timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
             for i in 1..=NUM_ELEMENTS {
                 let id = Uuid::new_v4();
-                let entry = IdOnlyTimerEntry {
+                let entry = UuidOnlyTimerEntry {
                     id,
                     delay: Duration::from_millis(i as u64),
                 };
@@ -179,10 +179,10 @@ fn read_only_bench(bencher: &mut Bencher) -> () {
 fn read_only_single_bench(bencher: &mut Bencher) -> () {
     bencher.iter_batched(
         || {
-            let mut timer: QuadWheelWithOverflow<IdOnlyTimerEntry> = QuadWheelWithOverflow::new();
+            let mut timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
             for _i in 1..=NUM_ELEMENTS {
                 let id = Uuid::new_v4();
-                let entry = IdOnlyTimerEntry {
+                let entry = UuidOnlyTimerEntry {
                     id,
                     delay: Duration::from_millis(1),
                 };
@@ -206,14 +206,14 @@ fn read_only_single_bench(bencher: &mut Bencher) -> () {
 
 fn read_write_bench(bencher: &mut Bencher) -> () {
     let id = Uuid::new_v4();
-    let entry = IdOnlyTimerEntry {
+    let entry = UuidOnlyTimerEntry {
         id,
         delay: Duration::from_millis(1),
     };
     let entry_rc = Rc::new(entry);
     bencher.iter_batched(
         || {
-            let timer: QuadWheelWithOverflow<IdOnlyTimerEntry> = QuadWheelWithOverflow::new();
+            let timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
             timer
         },
         move |mut timer| {
