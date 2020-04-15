@@ -1,5 +1,5 @@
 use super::*;
-use crate::wheels::*;
+use crate::wheels::{cancellable::*, *};
 use std::{
     fmt::Debug,
     hash::Hash,

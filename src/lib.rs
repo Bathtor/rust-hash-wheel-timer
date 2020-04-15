@@ -3,7 +3,7 @@ use std::{hash::Hash, time::Duration};
 pub mod simulation;
 pub mod wheels;
 
-use wheels::{CancellableTimerEntry, TimerEntryWithDelay};
+use wheels::{cancellable::CancellableTimerEntry, TimerEntryWithDelay};
 
 mod timers;
 pub use self::timers::*;

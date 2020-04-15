@@ -1,107 +1,51 @@
 use super::*;
-use arr_macro::arr;
-#[cfg(feature = "fnv")]
-use fnv::FnvHashMap;
-use std::{
-    cmp::Eq,
-    convert::Infallible,
-    fmt::Debug,
-    hash::Hash,
-    mem,
-    rc::{Rc, Weak},
-    time::Duration,
-    u32,
-};
+use crate::wheels::byte_wheel::*;
+use std::{fmt::Debug, time::Duration};
 
-#[cfg(not(feature = "fnv"))]
-use std::collections::HashMap;
-
-// trait TimeWheel<IndexType> {
-//     fn tick(&mut self, results: &mut TimerList) -> IndexType;
-// }
-
-/// A trait for timer entries that can be uniquely identified, so they can be cancelled
-pub trait CancellableTimerEntry: Debug {
-    /// The type of the unique id of the outstanding timeout
-    type Id: Hash + Clone + Eq;
-
-    /// Returns the unique id of the outstanding timeout
-    fn id(&self) -> &Self::Id;
-}
-
-/// A trait for timer entries that store their delay along the with the state
-pub trait TimerEntryWithDelay: CancellableTimerEntry {
-    /// Returns the time until the timeout is supposed to be triggered
-    fn delay(&self) -> Duration;
-}
-
-struct WheelEntry<EntryType, RestType> {
-    entry: Weak<EntryType>,
-    rest: RestType,
-}
-
-type WheelEntryList<EntryType, RestType> = Vec<WheelEntry<EntryType, RestType>>;
-
-struct ByteWheel<EntryType, RestType> {
-    slots: [Option<WheelEntryList<EntryType, RestType>>; 256],
-    count: u64,
-    current: u8,
-}
-
-impl<EntryType, RestType> ByteWheel<EntryType, RestType> {
-    fn new() -> Self {
-        let slots: [Option<WheelEntryList<EntryType, RestType>>; 256] = arr![Option::None; 256];
-        ByteWheel {
-            slots,
-            count: 0,
-            current: 0,
-        }
-    }
-
-    fn insert(&mut self, pos: u8, e: Weak<EntryType>, r: RestType) -> () {
-        let index = pos as usize;
-        let we = WheelEntry { entry: e, rest: r };
-        if self.slots[index].is_none() {
-            let l = Vec::new();
-            let bl = Some(l);
-            self.slots[index] = bl;
-        }
-        if let Some(ref mut l) = &mut self.slots[index] {
-            l.push(we);
-            self.count += 1;
-        }
-    }
-
-    fn is_empty(&self) -> bool {
-        self.count == 0
-    }
-
-    fn tick(&mut self, results: &mut WheelEntryList<EntryType, RestType>) -> u8 {
-        self.current = self.current.wrapping_add(1u8);
-        let index = self.current as usize;
-        let cur = self.slots[index].take(); //mem::replace(&mut self.slots[index], None);
-        match cur {
-            Some(mut l) => {
-                self.count -= l.len() as u64;
-                results.append(l.as_mut());
-            }
-            None => (), // nothing to do
-        }
-        self.current
-    }
-}
-
-struct OverflowEntry<EntryType> {
-    entry: Weak<EntryType>,
+struct OverflowEntry<EntryType>
+where
+    EntryType: Debug,
+{
+    entry: EntryType,
     remaining_delay: Duration,
 }
-impl<EntryType> OverflowEntry<EntryType> {
-    fn new(entry: Weak<EntryType>, remaining_delay: Duration) -> Self {
+impl<EntryType> OverflowEntry<EntryType>
+where
+    EntryType: Debug,
+{
+    fn new(entry: EntryType, remaining_delay: Duration) -> Self {
         OverflowEntry {
             entry,
             remaining_delay,
         }
     }
+}
+
+/// Indicates whether an entry should be moved into the next wheel, or dropped
+///
+/// Use this for implementing logic for cancellable timers.
+#[derive(PartialEq, Eq, Debug)]
+pub enum PruneDecision {
+    Keep,
+    Drop,
+}
+impl PruneDecision {
+    #[inline(always)]
+    pub fn should_keep(&self) -> bool {
+        self == &PruneDecision::Keep
+    }
+
+    #[inline(always)]
+    pub fn should_drop(&self) -> bool {
+        self == &PruneDecision::Drop
+    }
+}
+
+/// A simple pruner implementation that never drops any value
+///
+/// This is the default pruner for the [QuadWheelWithOverflow](QuadWheelWithOverflow)
+pub fn no_prune<E>(_e: &E) -> PruneDecision {
+    PruneDecision::Keep
 }
 
 /// An implementation of four-level byte-sized wheel
@@ -113,17 +57,14 @@ impl<EntryType> OverflowEntry<EntryType> {
 /// everything else goes into the overflow `Vec`.
 pub struct QuadWheelWithOverflow<EntryType>
 where
-    EntryType: CancellableTimerEntry,
+    EntryType: Debug,
 {
     primary: ByteWheel<EntryType, [u8; 0]>,
     secondary: ByteWheel<EntryType, [u8; 1]>,
     tertiary: ByteWheel<EntryType, [u8; 2]>,
     quarternary: ByteWheel<EntryType, [u8; 3]>,
     overflow: Vec<OverflowEntry<EntryType>>,
-    #[cfg(feature = "fnv")]
-    timers: FnvHashMap<EntryType::Id, Rc<EntryType>>,
-    #[cfg(not(feature = "fnv"))]
-    timers: HashMap<EntryType::Id, Rc<EntryType>>,
+    pruner: fn(&EntryType) -> PruneDecision,
 }
 
 const MAX_SCHEDULE_DUR: Duration = Duration::from_millis(u32::MAX as u64);
@@ -132,23 +73,21 @@ const PRIMARY_LENGTH: u32 = 1 << 8; // 2^8
 const SECONDARY_LENGTH: u32 = 1 << 16; // 2^16
 const TERTIARY_LENGTH: u32 = 1 << 24; // 2^24
 
+impl<EntryType> Default for QuadWheelWithOverflow<EntryType>
+where
+    EntryType: Debug,
+{
+    fn default() -> Self {
+        QuadWheelWithOverflow::new(no_prune::<EntryType>)
+    }
+}
+
 impl<EntryType> QuadWheelWithOverflow<EntryType>
 where
     EntryType: TimerEntryWithDelay,
 {
     /// Insert a new timeout into the wheel
     pub fn insert(&mut self, e: EntryType) -> Result<(), TimerError<EntryType>> {
-        self.insert_ref(Rc::new(e)).map_err(|err| match err {
-            TimerError::Expired(rc_e) => {
-                let e = Rc::try_unwrap(rc_e).unwrap(); // No one except us should have references as this point, so this should be safe
-                TimerError::Expired(e)
-            }
-            TimerError::NotFound => TimerError::NotFound,
-        })
-    }
-
-    /// Insert a new timeout into the wheel
-    pub fn insert_ref(&mut self, e: Rc<EntryType>) -> Result<(), TimerError<Rc<EntryType>>> {
         let delay = e.delay();
         self.insert_ref_with_delay(e, delay)
     }
@@ -156,54 +95,46 @@ where
 
 impl<EntryType> QuadWheelWithOverflow<EntryType>
 where
-    EntryType: CancellableTimerEntry,
+    EntryType: Debug,
 {
     /// Create a new wheel
-    pub fn new() -> Self {
+    pub fn new(pruner: fn(&EntryType) -> PruneDecision) -> Self {
         QuadWheelWithOverflow {
             primary: ByteWheel::new(),
             secondary: ByteWheel::new(),
             tertiary: ByteWheel::new(),
             quarternary: ByteWheel::new(),
             overflow: Vec::new(),
-            #[cfg(feature = "fnv")]
-            timers: FnvHashMap::default(),
-            #[cfg(not(feature = "fnv"))]
-            timers: HashMap::new(),
+            pruner,
         }
     }
 
-    fn remaining_time_in_cycle(&self) -> u64 {
+    /// Described how many ticks are left before the timer has wrapped around completely
+    pub fn remaining_time_in_cycle(&self) -> u64 {
         CYCLE_LENGTH - (self.current_time_in_cycle() as u64)
     }
 
-    fn current_time_in_cycle(&self) -> u32 {
+    /// Produces a 32-bit timestamp including the current index of every wheel
+    pub fn current_time_in_cycle(&self) -> u32 {
         let time_bytes = [
-            self.quarternary.current,
-            self.tertiary.current,
-            self.secondary.current,
-            self.primary.current,
+            self.quarternary.current(),
+            self.tertiary.current(),
+            self.secondary.current(),
+            self.primary.current(),
         ];
         u32::from_be(unsafe { mem::transmute(time_bytes) })
-    }
-
-    fn insert_timer_ref(&mut self, e: Rc<EntryType>) -> Weak<EntryType> {
-        let weak_e = Rc::downgrade(&e);
-        self.timers.insert(e.id().clone(), e);
-        weak_e
     }
 
     /// Insert a new timeout into the wheel to be returned after `delay` ticks
     pub fn insert_ref_with_delay(
         &mut self,
-        e: Rc<EntryType>,
+        e: EntryType,
         delay: Duration,
-    ) -> Result<(), TimerError<Rc<EntryType>>> {
+    ) -> Result<(), TimerError<EntryType>> {
         if delay >= MAX_SCHEDULE_DUR {
             let remaining_delay = Duration::from_millis(self.remaining_time_in_cycle());
             let new_delay = delay - remaining_delay;
-            let weak_e = self.insert_timer_ref(e);
-            let overflow_e = OverflowEntry::new(weak_e, new_delay);
+            let overflow_e = OverflowEntry::new(e, new_delay);
             self.overflow.push(overflow_e);
             Ok(())
         } else {
@@ -220,30 +151,26 @@ where
             match zero_bytes {
                 [0, 0, 0, 0] => Err(TimerError::Expired(e)),
                 [0, 0, 0, _] => {
-                    let weak_e = self.insert_timer_ref(e);
-                    self.primary.insert(absolute_bytes[3], weak_e, []);
+                    self.primary.insert(absolute_bytes[3], e, []);
                     Ok(())
                 }
                 [0, 0, _, _] => {
-                    let weak_e = self.insert_timer_ref(e);
                     self.secondary
-                        .insert(absolute_bytes[2], weak_e, [absolute_bytes[3]]);
+                        .insert(absolute_bytes[2], e, [absolute_bytes[3]]);
                     Ok(())
                 }
                 [0, _, _, _] => {
-                    let weak_e = self.insert_timer_ref(e);
                     self.tertiary.insert(
                         absolute_bytes[1],
-                        weak_e,
+                        e,
                         [absolute_bytes[2], absolute_bytes[3]],
                     );
                     Ok(())
                 }
                 [_, _, _, _] => {
-                    let weak_e = self.insert_timer_ref(e);
                     self.quarternary.insert(
                         absolute_bytes[0],
-                        weak_e,
+                        e,
                         [absolute_bytes[1], absolute_bytes[2], absolute_bytes[3]],
                     );
                     Ok(())
@@ -252,115 +179,77 @@ where
         }
     }
 
-    /// Cancel the timeout with the given `id`
-    ///
-    /// This method is very cheap, as it doesn't actually touch the wheels at all.
-    /// It simply removes the value from the lookup table, so it can't be executed
-    /// once its triggered. This also automatically prevents rescheduling of periodic timeouts.
-    pub fn cancel(&mut self, id: &EntryType::Id) -> Result<(), TimerError<Infallible>> {
-        // Simply remove it from the lookup table
-        // This will prevent the Weak pointer in the wheels from upgrading later
-        match self.timers.remove_entry(id) {
-            Some(_) => Ok(()),
-            None => Err(TimerError::NotFound),
-        }
-    }
-
-    fn take_timer(&mut self, weak_e: Weak<EntryType>) -> Option<Rc<EntryType>> {
-        match weak_e.upgrade() {
-            Some(rc_e) => {
-                match self.timers.remove_entry(rc_e.id()) {
-                    Some(rc_e2) => drop(rc_e2), // ok
-                    None => panic!("TimerEntry was upgraded but not in timers list!"),
-                }
-                Some(rc_e)
-            }
-            None => None,
-        }
-    }
-
-    fn is_alive(&self, weak_e: &Weak<EntryType>) -> bool {
-        match weak_e.upgrade() {
-            Some(_) => true,
-            None => false,
-        }
-    }
-
     /// Move the wheel forward by a single unit (ms)
     ///
     /// Returns a list of all timers that expire during this tick.
-    pub fn tick(&mut self) -> Vec<Rc<EntryType>> {
-        let mut res: Vec<Rc<EntryType>> = Vec::new();
+    pub fn tick(&mut self) -> Vec<EntryType> {
+        let mut res: Vec<EntryType> = Vec::new();
         // primary
-        let mut move0: WheelEntryList<EntryType, [u8; 0]> = Vec::new();
-        let current0 = self.primary.tick(&mut move0);
-        for we in move0.drain(..) {
-            if let Some(e) = self.take_timer(we.entry) {
-                res.push(e);
+        let (move0_opt, current0) = self.primary.tick();
+        if let Some(move0) = move0_opt {
+            res.reserve(move0.len());
+            for we in move0 {
+                if (self.pruner)(&we.entry).should_keep() {
+                    res.push(we.entry);
+                }
             }
         }
         if current0 == 0u8 {
             // secondary
-            let mut move1: WheelEntryList<EntryType, [u8; 1]> = Vec::new();
-            let current1 = self.secondary.tick(&mut move1);
-            for we in move1.drain(..) {
-                if we.rest[0] == 0u8 {
-                    if let Some(e) = self.take_timer(we.entry) {
-                        res.push(e);
-                    }
-                } else {
-                    if self.is_alive(&we.entry) {
-                        self.primary.insert(we.rest[0], we.entry, []);
+            let (move1_opt, current1) = self.secondary.tick();
+            if let Some(move1) = move1_opt {
+                // Don't bother reserving, as most of the values will likely be redistributed over the primary wheel instead of being returned
+                for we in move1 {
+                    if (self.pruner)(&we.entry).should_keep() {
+                        if we.rest[0] == 0u8 {
+                            res.push(we.entry);
+                        } else {
+                            self.primary.insert(we.rest[0], we.entry, []);
+                        }
                     }
                 }
             }
             if current1 == 0u8 {
                 // tertiary
-                let mut move2: WheelEntryList<EntryType, [u8; 2]> = Vec::new();
-                let current2 = self.tertiary.tick(&mut move2);
-                for we in move2.drain(..) {
-                    match we.rest {
-                        [0, 0] => {
-                            if let Some(e) = self.take_timer(we.entry) {
-                                res.push(e)
-                            }
-                        }
-                        [0, b0] => {
-                            if self.is_alive(&we.entry) {
-                                self.primary.insert(b0, we.entry, []);
-                            }
-                        }
-                        [b1, b0] => {
-                            if self.is_alive(&we.entry) {
-                                self.secondary.insert(b1, we.entry, [b0]);
+                let (move2_opt, current2) = self.tertiary.tick();
+                if let Some(move2) = move2_opt {
+                    // Don't bother reserving, as most of the values will likely be redistributed over the primary wheel instead of being returned
+                    for we in move2 {
+                        if (self.pruner)(&we.entry).should_keep() {
+                            match we.rest {
+                                [0, 0] => {
+                                    res.push(we.entry);
+                                }
+                                [0, b0] => {
+                                    self.primary.insert(b0, we.entry, []);
+                                }
+                                [b1, b0] => {
+                                    self.secondary.insert(b1, we.entry, [b0]);
+                                }
                             }
                         }
                     }
                 }
                 if current2 == 0u8 {
                     // quaternary
-                    let mut move3: WheelEntryList<EntryType, [u8; 3]> = Vec::new();
-                    let current3 = self.quarternary.tick(&mut move3);
-                    for we in move3.drain(..) {
-                        match we.rest {
-                            [0, 0, 0] => {
-                                if let Some(e) = self.take_timer(we.entry) {
-                                    res.push(e)
-                                }
-                            }
-                            [0, 0, b0] => {
-                                if self.is_alive(&we.entry) {
-                                    self.primary.insert(b0, we.entry, []);
-                                }
-                            }
-                            [0, b1, b0] => {
-                                if self.is_alive(&we.entry) {
-                                    self.secondary.insert(b1, we.entry, [b0]);
-                                }
-                            }
-                            [b2, b1, b0] => {
-                                if self.is_alive(&we.entry) {
-                                    self.tertiary.insert(b2, we.entry, [b1, b0]);
+                    let (move3_opt, current3) = self.quarternary.tick();
+                    if let Some(move3) = move3_opt {
+                        // Don't bother reserving, as most of the values will likely be redistributed over the primary wheel instead of being returned
+                        for we in move3 {
+                            if (self.pruner)(&we.entry).should_keep() {
+                                match we.rest {
+                                    [0, 0, 0] => {
+                                        res.push(we.entry);
+                                    }
+                                    [0, 0, b0] => {
+                                        self.primary.insert(b0, we.entry, []);
+                                    }
+                                    [0, b1, b0] => {
+                                        self.secondary.insert(b1, we.entry, [b0]);
+                                    }
+                                    [b2, b1, b0] => {
+                                        self.tertiary.insert(b2, we.entry, [b1, b0]);
+                                    }
                                 }
                             }
                         }
@@ -370,11 +259,12 @@ where
                         if !self.overflow.is_empty() {
                             let mut ol = Vec::with_capacity(self.overflow.len() / 2); // assume that about half are going to be scheduled now
                             mem::swap(&mut self.overflow, &mut ol);
-                            for overflow_e in ol.drain(..) {
-                                if let Some(rc_e) = self.take_timer(overflow_e.entry) {
-                                    match self
-                                        .insert_ref_with_delay(rc_e, overflow_e.remaining_delay)
-                                    {
+                            for overflow_e in ol {
+                                if (self.pruner)(&overflow_e.entry).should_keep() {
+                                    match self.insert_ref_with_delay(
+                                        overflow_e.entry,
+                                        overflow_e.remaining_delay,
+                                    ) {
                                         Ok(()) => (), // ignore
                                         Err(TimerError::Expired(e)) => res.push(e),
                                         Err(f) => panic!("Unexpected error during insert: {:?}", f),
@@ -394,13 +284,13 @@ where
     /// No timers will be executed for the skipped time.
     /// Only use this after determining that it's actually
     /// valid with [can_skip](QuadWheelWithOverflow::can_skip)!
-    pub fn skip(&mut self, amount: u32) {
+    pub fn skip(&mut self, amount: u32) -> () {
         let new_time = self.current_time_in_cycle().wrapping_add(amount);
         let new_time_bytes: [u8; 4] = unsafe { mem::transmute(new_time.to_be()) };
-        self.primary.current = new_time_bytes[3];
-        self.secondary.current = new_time_bytes[2];
-        self.tertiary.current = new_time_bytes[1];
-        self.quarternary.current = new_time_bytes[0];
+        self.primary.advance(new_time_bytes[3]);
+        self.secondary.advance(new_time_bytes[2]);
+        self.tertiary.advance(new_time_bytes[1]);
+        self.quarternary.advance(new_time_bytes[0]);
     }
 
     /// Determine if and how many ticks can be skipped
@@ -427,45 +317,13 @@ where
                     Skip::from_millis(rem - 1u32)
                 }
             } else {
-                let primary_current = self.primary.current as u32;
+                let primary_current = self.primary.current() as u32;
                 let rem = PRIMARY_LENGTH - primary_current;
                 Skip::from_millis(rem - 1u32)
             }
         } else {
             Skip::None
         }
-    }
-}
-
-/// Result of a [can_skip](QuadWheelWithOverflow::can_skip) invocation
-#[derive(PartialEq, Debug)]
-pub enum Skip {
-    /// The wheel is completely empty, so there's no point in skipping
-    ///
-    /// In fact, this may be a good opportunity to reset the wheel, if the
-    /// time semantics allow for that.
-    Empty,
-    /// It's possible to skip up to the provided number of ticks (in ms)
-    Millis(u32),
-    /// Nothing can be skipped, as the next tick has expiring timers
-    None,
-}
-
-impl Skip {
-    /// Provide a skip instance from ms
-    ///
-    /// A `ms` value of `0` will result in a `Skip::None`.
-    pub fn from_millis(ms: u32) -> Skip {
-        if ms == 0 {
-            Skip::None
-        } else {
-            Skip::Millis(ms)
-        }
-    }
-
-    /// A skip instance for empty wheels
-    pub fn empty() -> Skip {
-        Skip::Empty
     }
 }
 
@@ -478,7 +336,7 @@ mod uuid_tests {
 
     #[test]
     fn single_schedule_fail() {
-        let mut timer = QuadWheelWithOverflow::new();
+        let mut timer = QuadWheelWithOverflow::default();
         let id = Uuid::new_v4();
         let res = timer.insert(IdOnlyTimerEntry {
             id,
@@ -493,7 +351,7 @@ mod uuid_tests {
 
     #[test]
     fn single_ms_schedule() {
-        let mut timer = QuadWheelWithOverflow::new();
+        let mut timer = QuadWheelWithOverflow::default();
         let id = Uuid::new_v4();
         timer
             .insert(UuidOnlyTimerEntry {
@@ -507,23 +365,8 @@ mod uuid_tests {
     }
 
     #[test]
-    fn single_ms_cancel() {
-        let mut timer = QuadWheelWithOverflow::new();
-        let id = Uuid::new_v4();
-        timer
-            .insert(UuidOnlyTimerEntry {
-                id,
-                delay: Duration::from_millis(1),
-            })
-            .expect("Could not insert timer entry!");
-        timer.cancel(&id).expect("Entry could not be cancelled!");
-        let res = timer.tick();
-        assert_eq!(res.len(), 0);
-    }
-
-    #[test]
     fn single_ms_reschedule() {
-        let mut timer = QuadWheelWithOverflow::new();
+        let mut timer = QuadWheelWithOverflow::default();
         let id = Uuid::new_v4();
         let entry = UuidOnlyTimerEntry {
             id,
@@ -536,15 +379,13 @@ mod uuid_tests {
             assert_eq!(res.len(), 1);
             let entry = res.pop().unwrap();
             assert_eq!(entry.id(), &id);
-            timer
-                .insert_ref(entry)
-                .expect("Could not insert timer entry!");
+            timer.insert(entry).expect("Could not insert timer entry!");
         }
     }
 
     #[test]
     fn increasing_schedule_no_overflow() {
-        let mut timer = QuadWheelWithOverflow::new();
+        let mut timer = QuadWheelWithOverflow::default();
         let mut ids: [Uuid; 25] = [Uuid::nil(); 25];
         for i in 0..=24 {
             let timeout: u64 = 1 << i;
@@ -578,7 +419,7 @@ mod uuid_tests {
 
     #[test]
     fn increasing_schedule_overflow() {
-        let mut timer = QuadWheelWithOverflow::new();
+        let mut timer = QuadWheelWithOverflow::default();
         let mut ids: [Uuid; 33] = [Uuid::nil(); 33];
         for i in 0..=32 {
             let timeout: u64 = 1 << i;
@@ -609,7 +450,7 @@ mod uuid_tests {
 
     #[test]
     fn increasing_skip() {
-        let mut timer = QuadWheelWithOverflow::new();
+        let mut timer = QuadWheelWithOverflow::default();
         let mut ids: [Uuid; 33] = [Uuid::nil(); 33];
         let mut timeouts: [u128; 33] = [0; 33];
         for i in 0..=32 {
@@ -663,7 +504,7 @@ mod u64_tests {
 
     #[test]
     fn single_schedule_fail() {
-        let mut timer = QuadWheelWithOverflow::new();
+        let mut timer = QuadWheelWithOverflow::default();
         let id = 1u64;
         let res = timer.insert(IdOnlyTimerEntry {
             id,
@@ -678,7 +519,7 @@ mod u64_tests {
 
     #[test]
     fn single_ms_schedule() {
-        let mut timer = QuadWheelWithOverflow::new();
+        let mut timer = QuadWheelWithOverflow::default();
         let id = 1u64;
         timer
             .insert(IdOnlyTimerEntry {
@@ -692,23 +533,8 @@ mod u64_tests {
     }
 
     #[test]
-    fn single_ms_cancel() {
-        let mut timer = QuadWheelWithOverflow::new();
-        let id = 1u64;
-        timer
-            .insert(IdOnlyTimerEntry {
-                id,
-                delay: Duration::from_millis(1),
-            })
-            .expect("Could not insert timer entry!");
-        timer.cancel(&id).expect("Entry could not be cancelled!");
-        let res = timer.tick();
-        assert_eq!(res.len(), 0);
-    }
-
-    #[test]
     fn single_ms_reschedule() {
-        let mut timer = QuadWheelWithOverflow::new();
+        let mut timer = QuadWheelWithOverflow::default();
         let id = 1u64;
         let entry = IdOnlyTimerEntry {
             id,
@@ -721,15 +547,13 @@ mod u64_tests {
             assert_eq!(res.len(), 1);
             let entry = res.pop().unwrap();
             assert_eq!(entry.id(), &id);
-            timer
-                .insert_ref(entry)
-                .expect("Could not insert timer entry!");
+            timer.insert(entry).expect("Could not insert timer entry!");
         }
     }
 
     #[test]
     fn increasing_schedule_no_overflow() {
-        let mut timer = QuadWheelWithOverflow::new();
+        let mut timer = QuadWheelWithOverflow::default();
         let mut ids: [u64; 25] = [0; 25];
         for i in 0..=24 {
             let timeout: u64 = 1 << i;
@@ -763,7 +587,7 @@ mod u64_tests {
 
     #[test]
     fn increasing_schedule_overflow() {
-        let mut timer = QuadWheelWithOverflow::new();
+        let mut timer = QuadWheelWithOverflow::default();
         let mut ids: [u64; 33] = [0; 33];
         for i in 0..=32 {
             let timeout: u64 = 1 << i;
@@ -794,7 +618,7 @@ mod u64_tests {
 
     #[test]
     fn increasing_skip() {
-        let mut timer = QuadWheelWithOverflow::new();
+        let mut timer = QuadWheelWithOverflow::default();
         let mut ids: [u64; 33] = [0; 33];
         let mut timeouts: [u128; 33] = [0; 33];
         for i in 0..=32 {

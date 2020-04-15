@@ -7,7 +7,10 @@ use criterion::{
     Criterion,
     Throughput,
 };
-use hierarchical_hash_wheel_timer::{wheels::*, UuidOnlyTimerEntry};
+use hierarchical_hash_wheel_timer::{
+    wheels::{cancellable::*, *},
+    UuidOnlyTimerEntry,
+};
 use rand::prelude::*;
 use std::{rc::Rc, time::Duration};
 use uuid::Uuid;
