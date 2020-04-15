@@ -3,9 +3,11 @@ use crate::wheels::quad_wheel::{
     PruneDecision,
     QuadWheelWithOverflow as BasicQuadWheelWithOverflow,
 };
-#[cfg(feature = "fnv")]
+#[cfg(feature = "fnv-hash")]
 use fnv::FnvHashMap;
-#[cfg(not(feature = "fnv"))]
+#[cfg(feature = "fx-hash")]
+use rustc_hash::FxHashMap;
+#[cfg(feature = "sip-hash")]
 use std::collections::HashMap;
 
 /// A trait for timer entries that can be uniquely identified, so they can be cancelled
@@ -40,10 +42,12 @@ where
     EntryType: CancellableTimerEntry,
 {
     wheel: BasicQuadWheelWithOverflow<Weak<EntryType>>,
-    #[cfg(feature = "fnv")]
+    #[cfg(feature = "fnv-hash")]
     timers: FnvHashMap<EntryType::Id, Rc<EntryType>>,
-    #[cfg(not(feature = "fnv"))]
+    #[cfg(feature = "sip-hash")]
     timers: HashMap<EntryType::Id, Rc<EntryType>>,
+    #[cfg(feature = "fx-hash")]
+    timers: FxHashMap<EntryType::Id, Rc<EntryType>>,
 }
 
 impl<EntryType> QuadWheelWithOverflow<EntryType>
@@ -76,10 +80,12 @@ where
     pub fn new() -> Self {
         QuadWheelWithOverflow {
             wheel: BasicQuadWheelWithOverflow::new(rc_prune::<EntryType>),
-            #[cfg(feature = "fnv")]
+            #[cfg(feature = "fnv-hash")]
             timers: FnvHashMap::default(),
-            #[cfg(not(feature = "fnv"))]
+            #[cfg(feature = "sip-hash")]
             timers: HashMap::new(),
+            #[cfg(feature = "fx-hash")]
+            timers: FxHashMap::default(),
         }
     }
 
