@@ -97,7 +97,7 @@ where
     ) -> Result<(), TimerError<Rc<EntryType>>> {
         let weak_e = Rc::downgrade(&e);
 
-        match self.wheel.insert_ref_with_delay(weak_e, delay) {
+        match self.wheel.insert_with_delay(weak_e, delay) {
             Ok(_) => {
                 self.timers.insert(e.id().clone(), e);
                 Ok(())

@@ -89,7 +89,7 @@ where
     /// Insert a new timeout into the wheel
     pub fn insert(&mut self, e: EntryType) -> Result<(), TimerError<EntryType>> {
         let delay = e.delay();
-        self.insert_ref_with_delay(e, delay)
+        self.insert_with_delay(e, delay)
     }
 }
 
@@ -126,7 +126,7 @@ where
     }
 
     /// Insert a new timeout into the wheel to be returned after `delay` ticks
-    pub fn insert_ref_with_delay(
+    pub fn insert_with_delay(
         &mut self,
         e: EntryType,
         delay: Duration,
@@ -261,7 +261,7 @@ where
                             mem::swap(&mut self.overflow, &mut ol);
                             for overflow_e in ol {
                                 if (self.pruner)(&overflow_e.entry).should_keep() {
-                                    match self.insert_ref_with_delay(
+                                    match self.insert_with_delay(
                                         overflow_e.entry,
                                         overflow_e.remaining_delay,
                                     ) {
