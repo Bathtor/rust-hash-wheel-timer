@@ -8,6 +8,9 @@ use wheels::{cancellable::CancellableTimerEntry, TimerEntryWithDelay};
 mod timers;
 pub use self::timers::*;
 
+#[cfg(feature = "thread-timer")]
+pub mod thread_timer;
+
 #[cfg(feature = "uuid-extras")]
 mod uuid_extras;
 #[cfg(feature = "uuid-extras")]
