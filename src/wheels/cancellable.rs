@@ -1,3 +1,41 @@
+//! An implementation of a four-level hierarchical hash wheel with overflow
+//! that allows entries to be cancelled before they expire.
+//!
+//! The design reuses the normal [quad_wheel](crate::wheels::quad_wheel), but
+//! adds an internal hash map to keep track of which timeouts are still valid.
+//! This allows for constant time cancellation of timer entries,
+//! but with lazy deallocation (garbage collection) as the wheel advances.
+//!
+//! Depending on your concrete application and identifier type different hashers may
+//! give you the best performance. By the default this crate will use the `FxHasher`
+//! from the [rustc-hash](https://crates.io/crates/rustc-hash) crate, which provides very
+//! fast performance for small ids such as `u64` or `Uuid`.
+//! If you require a different set of performance characteristics you can switch the implemantion
+//! using the `fnv-hash` or `sip-hash` features when compiling this crate.
+//!
+//! # Examples
+//! A very simple example of schedulling and then cancelling a single entry can be seen below.
+//! ```
+//! # use std::time::Duration;
+//! use hierarchical_hash_wheel_timer::*;
+//! use hierarchical_hash_wheel_timer::wheels::cancellable::*;
+//!
+//! let mut timer = QuadWheelWithOverflow::new();
+//! let id = 1u64;
+//! timer
+//!     .insert(IdOnlyTimerEntry {
+//!         id,
+//!         delay: Duration::from_millis(1),
+//!     })
+//!     .expect("Could not insert timer entry!");
+//! timer.cancel(&id).expect("Entry could not be cancelled!");
+//! let res = timer.tick();
+//! assert_eq!(res.len(), 0);
+//! ```
+//!
+//! More advanced examples can be found in the sources for the [SimulationTimer](crate::simulation::SimulationTimer)
+//! and the [TimerWithThread](crate::thread_timer::TimerWithThread).
+
 use super::*;
 use crate::wheels::quad_wheel::{
     PruneDecision,

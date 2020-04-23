@@ -35,7 +35,14 @@ pub trait OneshotState {
     /// The type of the unique id of the outstanding timeout
     type Id: Hash + Clone + Eq;
 
+    /// A reference to the id associated with this state
     fn id(&self) -> &Self::Id;
+    /// Trigger should be called by the timer implementation
+    /// when the timeout has expired.
+    ///
+    /// The method can be used for custom expiry actions,
+    /// but it is strongly recommended to keep these quick,
+    /// as long actions can delay the execution of later timers.
     fn trigger(self) -> ();
 }
 
@@ -49,7 +56,21 @@ pub trait PeriodicState {
     /// The type of the unique id of the outstanding timeout
     type Id: Hash + Clone + Eq;
 
+    /// A reference to the id associated with this state
     fn id(&self) -> &Self::Id;
+
+    /// Trigger should be called by the timer implementation
+    /// when the timeout has expired.
+    ///
+    /// The method can be used for custom expiry actions,
+    /// but it is strongly recommended to keep these quick,
+    /// as long actions can delay the execution of later timers.
+    ///
+    /// For periodic actions the trigger actions may mutate (or replace)
+    /// the state of the timer entry itself.
+    /// Together with the ability to prevent reschedulling, this can be used
+    /// to implement "counter"-style timers, that happen a fixed number of times
+    /// before being dropped automatically.
     fn trigger(self) -> TimerReturn<Self>
     where
         Self: Sized;
@@ -87,6 +108,9 @@ where
     O: OneshotState<Id = I>,
     P: PeriodicState<Id = I>,
 {
+    /// A reference to the id associated with this entry
+    ///
+    /// Equals calling the `id()` function on either state type.
     pub fn id(&self) -> &I {
         match self {
             TimerEntry::OneShot { state, .. } => state.id(),
@@ -160,6 +184,9 @@ pub struct OneShotClosureState<I> {
 }
 
 impl<I> OneShotClosureState<I> {
+    /// Produces a new instance of this state type
+    /// from a unique id and the action to be executed
+    /// when it expires.
     pub fn new<F>(id: I, action: F) -> Self
     where
         F: FnOnce(I) + Send + 'static,
@@ -173,6 +200,11 @@ impl<I> OneShotClosureState<I> {
 
 #[cfg(feature = "uuid-extras")]
 impl OneShotClosureState<uuid::Uuid> {
+    /// Produces a new instance of this state type
+    /// using a random unique id and the action to be executed
+    /// when it expires.
+    ///
+    /// Uses `Uuid::new_v4()` internally.
     pub fn with_random_id<F>(action: F) -> Self
     where
         F: FnOnce(uuid::Uuid) + Send + 'static,
@@ -218,6 +250,9 @@ pub struct PeriodicClosureState<I> {
 }
 
 impl<I> PeriodicClosureState<I> {
+    /// Produces a new instance of this state type
+    /// from a unique id and the action to be executed
+    /// every time it expires.
     pub fn new<F>(id: I, action: F) -> Self
     where
         F: FnMut(I) -> TimerReturn<()> + Send + 'static,
@@ -231,6 +266,11 @@ impl<I> PeriodicClosureState<I> {
 
 #[cfg(feature = "uuid-extras")]
 impl PeriodicClosureState<uuid::Uuid> {
+    /// Produces a new instance of this state type
+    /// using a random unique id and the action to be executed
+    /// every time it expires.
+    ///
+    /// Uses `Uuid::new_v4()` internally.
     pub fn with_random_id<F>(action: F) -> Self
     where
         F: FnMut(uuid::Uuid) -> TimerReturn<()> + Send + 'static,
@@ -271,8 +311,8 @@ where
     }
 }
 
-//pub struct ClosureTimerEntry<I>(TimerEntry<I, OneShotClosureState<I>,PeriodicClosureState<I>>)
-
+/// This trait is a convenience API for [timers](Timer) that use the closure state types,
+/// i.e. [OneShotClosureState](OneShotClosureState) and [PeriodicClosureState](PeriodicClosureState).
 pub trait ClosureTimer: Timer {
     /// Schedule the `action` to be executed once after the `timeout` expires
     ///

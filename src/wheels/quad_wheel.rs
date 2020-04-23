@@ -1,3 +1,41 @@
+//! An implementation of a four-level hierarchical hash wheel with overflow.
+//!
+//! Combining four [byte wheels](crate::wheels::byte_wheel) we get a hierachical timer
+//! that can represent timeouts up to [`u32::MAX`](std::u32::MAX) time units into the future.
+//!
+//! In order to support timeouts of up to [`u64::MAX`](std::u64::MAX) time units,
+//! this implementation also keeps an overflow list, which stores all timers that didn't fit
+//! into any slot in the four wheels. Additions into this list happens in (amortised) constant time
+//! but movement from the list into the timer array is linear in the number of overflow items.
+//!
+//! Our design assumes that the vast majority of timers are going be scheduled less than
+//! [`u32::MAX`](std::u32::MAX) time units into the future. However, as movement from the overflow list
+//! still happens at a rate of over 6mio entries per second (on a 2019 16"MBP) for most applications
+//! there should be no large issues even if this assumption is not correct.
+//!
+//! # Examples
+//! A very simple example of schedulling and then expiring a single entry can be seen below.
+//! ```
+//! # use std::time::Duration;
+//! use hierarchical_hash_wheel_timer::*;
+//! use hierarchical_hash_wheel_timer::wheels::quad_wheel::*;
+//!
+//! let mut timer = QuadWheelWithOverflow::default();
+//! let id = 1u64;
+//! timer
+//!     .insert(IdOnlyTimerEntry {
+//!         id,
+//!         delay: Duration::from_millis(1),
+//!     })
+//!     .expect("Could not insert timer entry!");
+//! let res = timer.tick();
+//! assert_eq!(res.len(), 1);
+//! assert_eq!(res[0].id, id);
+//! ```
+//!
+//! More advanced examples can be found in the sources for the [SimulationTimer](crate::simulation::SimulationTimer)
+//! and the [TimerWithThread](crate::thread_timer::TimerWithThread).
+
 use super::*;
 use crate::wheels::byte_wheel::*;
 use std::{fmt::Debug, time::Duration};
@@ -26,15 +64,21 @@ where
 /// Use this for implementing logic for cancellable timers.
 #[derive(PartialEq, Eq, Debug)]
 pub enum PruneDecision {
+    /// Move the entry into the next wheel
     Keep,
+    /// Drop the entry
+    ///
+    /// Usually indicates that the entry has already been cancelled
     Drop,
 }
 impl PruneDecision {
+    /// `true` if this is a `PruneDecision::Keep`
     #[inline(always)]
     pub fn should_keep(&self) -> bool {
         self == &PruneDecision::Keep
     }
 
+    /// `true` if this is a `PruneDecision::Drop`
     #[inline(always)]
     pub fn should_drop(&self) -> bool {
         self == &PruneDecision::Drop

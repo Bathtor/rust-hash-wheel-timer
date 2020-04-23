@@ -1,3 +1,5 @@
+//! This module contains the level 1 and 2 APIs for building event timers.
+
 use super::*;
 use std::{
     cmp::Eq,
@@ -14,7 +16,7 @@ pub mod byte_wheel;
 pub mod cancellable;
 pub mod quad_wheel;
 
-/// Result of a [can_skip](QuadWheelWithOverflow::can_skip) invocation
+/// Result of a [can_skip](quad_wheel::QuadWheelWithOverflow::can_skip) invocation
 #[derive(PartialEq, Debug)]
 pub enum Skip {
     /// The wheel is completely empty, so there's no point in skipping

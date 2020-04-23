@@ -1,3 +1,43 @@
+//! This module provides an implementation for an event timer used to drive a discrete event simulation.
+//!
+//! Its particular feature is that it can skip quickly through periods where no events are schedulled as it doesn't track real time,
+//! but rather provides the rate at which the simulation proceeds.
+//!
+//! Progress in the simulation is driven by repeatedly calling the [next](SimulationTimer::next) function
+//! until it returns [SimulationStep::Finished](SimulationStep::Finished) indicating that the timer is empty
+//! and thus the simulation has run to completion.
+//!
+//! # Example
+//! ```
+//! # use std::sync::{Arc, Mutex};
+//! # use uuid::Uuid;
+//! # use std::time::Duration;
+//! use hierarchical_hash_wheel_timer::*;
+//! use hierarchical_hash_wheel_timer::simulation::*;
+//!
+//! let mut timer = SimulationTimer::for_uuid_closures();
+//!
+//! let barrier: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+//! let barrier2 = barrier.clone();
+//! let id = Uuid::new_v4();
+//! let delay = Duration::from_millis(150);
+//! timer.schedule_action_once(id, delay, move |timer_id|{
+//!     println!("Timer function was triggered! Id={:?}", timer_id);
+//!     let mut guard = barrier2.lock().unwrap();
+//!     *guard = true;
+//! });
+//! println!("Starting simulation run.");
+//! let mut running = true;
+//! while running {
+//!     match timer.next() {
+//!         SimulationStep::Ok => println!("Next!"),
+//!         SimulationStep::Finished => running = false,
+//!     }
+//! }
+//! println!("Simulation run done!");
+//! let guard = barrier.lock().unwrap();
+//! assert_eq!(*guard, true);
+//! ```
 use super::*;
 use crate::wheels::{cancellable::*, *};
 use std::{
@@ -181,11 +221,11 @@ impl
 
 /// Result of advancing virtual time
 pub enum SimulationStep {
-    /// No timeout remain
+    /// No timer entries remain
     ///
     /// The simulation can be considered complete.
     Finished,
-    /// Step was executed, but timeouts remain
+    /// Step was executed, but more timer entries remain
     ///
     /// Continue calling [next](SimulationTimer::next) to advance virtual time.
     Ok,

@@ -1,3 +1,17 @@
+//! This is the fundamental abstraction of this crate: a single hash wheel with 256 slots
+//! addressed with a single byte. Each slot stores a list of a generic event type.
+//!
+//! The whole wheel can be [ticked](ByteWheel::tick) causing entries in the slots that are being moved over
+//! to expire. With every tick, all expired event entries are returned for handling.
+//!
+//! In addition to its entry type, the byte wheel also carries a rest type.
+//! This type is used to track how much time remains for this entry in lower hierachy wheels.
+//! For example, the highest order wheel in four-level hierarchical hash wheel would carry a rest type
+//! of `[u8; 3]`, indicating that there are 3 lower level byte wheels that this entry must still go
+//! through before expiring.
+//!
+//! # Example
+//! Example usage of this abstraction can be seen in the source code of the [quad_wheel](crate::wheels::quad_wheel::QuadWheelWithOverflow).
 use arr_macro::arr;
 
 /// A single entry in a slot

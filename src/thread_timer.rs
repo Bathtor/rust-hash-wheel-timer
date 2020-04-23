@@ -1,3 +1,43 @@
+//! This module provides a timer for real-time event schedulling with millisecond accuracy.
+//!
+//! It runs on its own dedicated thread and uses a shareable handle called a `TimerRef` for communication with other threads.
+//! This inter-thread communication is based on [crossbeam_channel](crossbeam_channel).
+//!
+//! ## Note
+//! Sine this timer runs on its own thread, instance creation will fail if the generic id or state types used are not `Send`.
+//!
+//! # Example
+//! ```
+//! # use std::sync::{Arc, Mutex};
+//! # use uuid::Uuid;
+//! # use std::time::Duration;
+//! use hierarchical_hash_wheel_timer::*;
+//! use hierarchical_hash_wheel_timer::thread_timer::*;
+//!
+//! let timer_core = TimerWithThread::for_uuid_closures();
+//!
+//! let mut timer = timer_core.timer_ref();
+//!
+//! let barrier: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+//! let barrier2 = barrier.clone();
+//! let id = Uuid::new_v4();
+//! let delay = Duration::from_millis(150);
+//! timer.schedule_action_once(id, delay, move |timer_id|{
+//!     println!("Timer function was triggered! Id={:?}", timer_id);
+//!     let mut guard = barrier2.lock().unwrap();
+//!     *guard = true;
+//! });
+//! println!("Waiting timing run to finish...");
+//! std::thread::sleep(delay);
+//! let guard = barrier.lock().unwrap();
+//! assert_eq!(*guard, true);
+//! drop(guard);
+//! drop(timer);
+//! timer_core
+//!    .shutdown()
+//!    .expect("Timer didn't shutdown properly!");
+//! ```
+
 use super::*;
 
 use crate::wheels::{cancellable::*, *};
@@ -160,7 +200,7 @@ where
 impl
     TimerWithThread<uuid::Uuid, OneShotClosureState<uuid::Uuid>, PeriodicClosureState<uuid::Uuid>>
 {
-    /// Shorthand for creating a simulation timer using Uuid identifiers and closure state
+    /// Shorthand for creating a timer instance using Uuid identifiers and closure state
     pub fn for_uuid_closures() -> Self {
         Self::new().expect("timer")
     }
