@@ -29,9 +29,12 @@
 //! });
 //! println!("Waiting timing run to finish...");
 //! std::thread::sleep(delay);
-//! let guard = barrier.lock().unwrap();
-//! assert_eq!(*guard, true);
-//! drop(guard);
+//! let mut done = false;
+//! while !done {
+//!     let guard = barrier.lock().unwrap();
+//!     done = *guard;
+//! }
+//! println!("Timing run completed!");
 //! drop(timer);
 //! timer_core
 //!    .shutdown()
