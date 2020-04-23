@@ -1,6 +1,6 @@
 [package]
 name = "hierarchical_hash_wheel_timer"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Lars Kroll <bathtor@googlemail.com>"]
 edition = "2018"
 description = "A low-level timer implementantion using a hierarchical four-level hash wheel with overflow."
