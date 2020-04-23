@@ -3,7 +3,7 @@
 A low-level timer implementation using a hierarchical four-level hash wheel together with an overflow vector.
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Bathtor/rust-hash-wheel-timer)
-[![Cargo](https://img.shields.io/crates/v/hierarchical_hash_wheel_timer.svg)](https://crates.io/crates/hierarchical_hash_wheel_timer) 
+[![Cargo](https://img.shields.io/crates/v/hierarchical_hash_wheel_timer?label=Cargo&style=plastic)](https://crates.io/crates/hierarchical_hash_wheel_timer) 
 [![Documentation](https://docs.rs/hierarchical_hash_wheel_timer/badge.svg)](https://docs.rs/hierarchical_hash_wheel_timer)
 [![Build Status](https://travis-ci.org/Bathtor/rust-hash-wheel-timer.svg?branch=master)](https://travis-ci.org/Bathtor/rust-hash-wheel-timer)
 
