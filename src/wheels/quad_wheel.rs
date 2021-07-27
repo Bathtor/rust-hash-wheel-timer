@@ -103,10 +103,10 @@ pub struct QuadWheelWithOverflow<EntryType>
 where
     EntryType: Debug,
 {
-    primary: ByteWheel<EntryType, [u8; 0]>,
-    secondary: ByteWheel<EntryType, [u8; 1]>,
-    tertiary: ByteWheel<EntryType, [u8; 2]>,
-    quarternary: ByteWheel<EntryType, [u8; 3]>,
+    primary: Box<ByteWheel<EntryType, [u8; 0]>>,
+    secondary: Box<ByteWheel<EntryType, [u8; 1]>>,
+    tertiary: Box<ByteWheel<EntryType, [u8; 2]>>,
+    quarternary: Box<ByteWheel<EntryType, [u8; 3]>>,
     overflow: Vec<OverflowEntry<EntryType>>,
     pruner: fn(&EntryType) -> PruneDecision,
 }
@@ -144,10 +144,10 @@ where
     /// Create a new wheel
     pub fn new(pruner: fn(&EntryType) -> PruneDecision) -> Self {
         QuadWheelWithOverflow {
-            primary: ByteWheel::new(),
-            secondary: ByteWheel::new(),
-            tertiary: ByteWheel::new(),
-            quarternary: ByteWheel::new(),
+            primary: Box::new(ByteWheel::new()),
+            secondary: Box::new(ByteWheel::new()),
+            tertiary: Box::new(ByteWheel::new()),
+            quarternary: Box::new(ByteWheel::new()),
             overflow: Vec::new(),
             pruner,
         }

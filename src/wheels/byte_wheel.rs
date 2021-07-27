@@ -12,7 +12,6 @@
 //!
 //! # Example
 //! Example usage of this abstraction can be seen in the source code of the [quad_wheel](crate::wheels::quad_wheel::QuadWheelWithOverflow).
-use arr_macro::arr;
 
 /// A single entry in a slot
 pub struct WheelEntry<EntryType, RestType> {
@@ -25,20 +24,26 @@ pub struct WheelEntry<EntryType, RestType> {
 /// Just a convenience type alias for the list type used in each slot
 pub type WheelEntryList<EntryType, RestType> = Vec<WheelEntry<EntryType, RestType>>;
 
+/// Number of slots for each ByteWheel
+const NUM_SLOTS: usize = 256;
+
 /// A single wheel with 256 slots of for elements of `EntryType`
 ///
 /// The `RestType` us used to store an array of bytes that are the rest of the delay.
 /// This way the same wheel structure can be used at different hierarchical levels.
 pub struct ByteWheel<EntryType, RestType> {
-    slots: [Option<WheelEntryList<EntryType, RestType>>; 256],
+    slots: [Option<WheelEntryList<EntryType, RestType>>; NUM_SLOTS],
     count: u64,
     current: u8,
 }
 
 impl<EntryType, RestType> ByteWheel<EntryType, RestType> {
+    const INIT_VALUE: Option<WheelEntryList<EntryType, RestType>> = None;
+
     /// Create a new empty ByteWheel
     pub fn new() -> Self {
-        let slots: [Option<WheelEntryList<EntryType, RestType>>; 256] = arr![Option::None; 256];
+        let slots: [Option<WheelEntryList<EntryType, RestType>>; NUM_SLOTS] = [Self::INIT_VALUE; NUM_SLOTS];
+
         ByteWheel {
             slots,
             count: 0,
