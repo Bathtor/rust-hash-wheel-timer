@@ -25,25 +25,24 @@ pub struct WheelEntry<EntryType, RestType> {
 pub type WheelEntryList<EntryType, RestType> = Vec<WheelEntry<EntryType, RestType>>;
 
 /// Number of slots for each ByteWheel
-const SLOTS: usize = 256;
+const NUM_SLOTS: usize = 256;
 
 /// A single wheel with 256 slots of for elements of `EntryType`
 ///
 /// The `RestType` us used to store an array of bytes that are the rest of the delay.
 /// This way the same wheel structure can be used at different hierarchical levels.
 pub struct ByteWheel<EntryType, RestType> {
-    slots: Box<[Option<WheelEntryList<EntryType, RestType>>]>,
+    slots: [Option<WheelEntryList<EntryType, RestType>>; NUM_SLOTS],
     count: u64,
     current: u8,
 }
 
 impl<EntryType, RestType> ByteWheel<EntryType, RestType> {
+    const INIT_VALUE: Option<WheelEntryList<EntryType, RestType>> = None;
+
     /// Create a new empty ByteWheel
     pub fn new() -> Self {
-        let slots: Box<[Option<WheelEntryList<EntryType, RestType>>]> = (0..SLOTS)
-            .map(|_| Option::None)
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
+        let slots: [Option<WheelEntryList<EntryType, RestType>>; NUM_SLOTS] = [Self::INIT_VALUE; NUM_SLOTS];
 
         ByteWheel {
             slots,
