@@ -1,6 +1,6 @@
 [package]
 name = "hierarchical_hash_wheel_timer"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Lars Kroll <bathtor@googlemail.com>"]
 edition = "2018"
 description = "A low-level timer implementantion using a hierarchical four-level hash wheel with overflow."
@@ -29,10 +29,7 @@ fx-hash = ["rustc-hash"]
 uuid = { version = "0.8", features = ["v4"] , optional = true}
 fnv = { version = "1.0", optional = true}
 rustc-hash = {version = "1.1", optional = true}
-crossbeam-channel = {version="0.4", optional = true}
-
-#[dev-dependencies]
-#uuid = { version = "0.8", features = ["v4"] }
+crossbeam-channel = {version="0.5", optional = true}
 
 [badges]
 # Maintenance: `status` is required Available options are `actively-developed`,
