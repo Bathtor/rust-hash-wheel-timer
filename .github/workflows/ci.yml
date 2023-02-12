@@ -2,11 +2,13 @@ name: CI
 on:
   push:
     branches:
-      - main
+      - master
   pull_request:
     branches:
-      - main
+      - master
     types: [opened, reopened, synchronize]
+  schedule:
+    - cron: '0 0 * * *'  # every day at midnight
 
 jobs:
   tests:
