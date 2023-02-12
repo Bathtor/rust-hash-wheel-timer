@@ -164,7 +164,11 @@ where
             Some(rc_e) => {
                 match self.timers.remove_entry(rc_e.id()) {
                     Some(rc_e2) => drop(rc_e2), // ok
-                    None => panic!("TimerEntry was upgraded but not in timers list!"),
+                    None => {
+                        // Perhaps it was removed via cancel(), and the underlying
+                        // Rc is still alive through some other reference
+                        return None
+                    }
                 }
                 Some(rc_e)
             }
@@ -432,6 +436,42 @@ mod u64_tests {
         timer.cancel(&id).expect("Entry could not be cancelled!");
         let res = timer.tick();
         assert_eq!(res.len(), 0);
+    }
+
+    #[test]
+    fn cancel_and_drain() {
+        let mut timer = QuadWheelWithOverflow::new();
+
+        let item1 = Rc::new(IdOnlyTimerEntry {
+            id: 1,
+            delay: Duration::from_millis(1),
+        });
+        let item2 = Rc::new(IdOnlyTimerEntry {
+            id: 2,
+            delay: Duration::from_millis(10),
+        });
+        let item3 = Rc::new(IdOnlyTimerEntry {
+            id: 3,
+            delay: Duration::from_millis(5),
+        });
+
+        timer
+            .insert_ref(Rc::clone(&item1))
+            .expect("Could not insert timer entry!");
+        timer
+            .insert_ref(Rc::clone(&item2))
+            .expect("Could not insert timer entry!");
+        timer
+            .insert_ref(Rc::clone(&item3))
+            .expect("Could not insert timer entry!");
+
+        timer.cancel(&2).expect("Entry could not be cancelled!");
+
+        let mut items = vec![];
+        for _ in 0..10 {
+            items.append(&mut timer.tick());
+        }
+        assert_eq!(items.len(), 2);
     }
 
     #[test]
