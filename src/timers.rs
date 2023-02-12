@@ -43,7 +43,7 @@ pub trait OneshotState {
     /// The method can be used for custom expiry actions,
     /// but it is strongly recommended to keep these quick,
     /// as long actions can delay the execution of later timers.
-    fn trigger(self) -> ();
+    fn trigger(self);
 }
 
 /// A trait for state that can be triggered more than once once
@@ -149,7 +149,7 @@ pub trait Timer {
     /// and the `timeout` expiring on the system's clock.
     /// Thus it is only guaranteed that the `state` is not triggered *before*
     /// the `timeout` expires, but no bounds on the lag are given.
-    fn schedule_once(&mut self, timeout: Duration, state: Self::OneshotState) -> ();
+    fn schedule_once(&mut self, timeout: Duration, state: Self::OneshotState);
 
     /// Schedule the `state` to be triggered every `timeout` time units
     ///
@@ -164,15 +164,10 @@ pub trait Timer {
     /// and the `timeout` expiring on the system's clock.
     /// Thus it is only guaranteed that the `state` is not triggered *before*
     /// the `timeout` expires, but no bounds on the lag are given.
-    fn schedule_periodic(
-        &mut self,
-        delay: Duration,
-        period: Duration,
-        state: Self::PeriodicState,
-    ) -> ();
+    fn schedule_periodic(&mut self, delay: Duration, period: Duration, state: Self::PeriodicState);
 
     /// Cancel the timer indicated by the unique `id`
-    fn cancel(&mut self, id: &Self::Id) -> ();
+    fn cancel(&mut self, id: &Self::Id);
 }
 
 /// A timeout state for a one-shot timer using a closure as the triggering action
@@ -223,7 +218,7 @@ where
         &self.id
     }
 
-    fn trigger(self) -> () {
+    fn trigger(self) {
         (self.action)(self.id)
     }
 }
@@ -323,7 +318,7 @@ pub trait ClosureTimer: Timer {
     /// and the `timeout` expiring on the system's clock.
     /// Thus it is only guaranteed that the `action` is not run *before*
     /// the `timeout` expires, but no bounds on the lag are given.
-    fn schedule_action_once<F>(&mut self, id: Self::Id, timeout: Duration, action: F) -> ()
+    fn schedule_action_once<F>(&mut self, id: Self::Id, timeout: Duration, action: F)
     where
         F: FnOnce(Self::Id) + Send + 'static;
 
@@ -345,8 +340,7 @@ pub trait ClosureTimer: Timer {
         delay: Duration,
         period: Duration,
         action: F,
-    ) -> ()
-    where
+    ) where
         F: FnMut(Self::Id) -> TimerReturn<()> + Send + 'static;
 }
 
@@ -359,7 +353,7 @@ where
         PeriodicState = PeriodicClosureState<I>,
     >,
 {
-    fn schedule_action_once<F>(&mut self, id: Self::Id, timeout: Duration, action: F) -> ()
+    fn schedule_action_once<F>(&mut self, id: Self::Id, timeout: Duration, action: F)
     where
         F: FnOnce(Self::Id) + Send + 'static,
     {
@@ -372,8 +366,7 @@ where
         delay: Duration,
         period: Duration,
         action: F,
-    ) -> ()
-    where
+    ) where
         F: FnMut(Self::Id) -> TimerReturn<()> + Send + 'static,
     {
         self.schedule_periodic(delay, period, PeriodicClosureState::new(id, action))

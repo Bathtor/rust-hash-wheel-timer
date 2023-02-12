@@ -189,9 +189,9 @@ where
             };
             let current_time = self.current_time_in_cycle();
             let absolute_time = delay.wrapping_add(current_time);
-            let absolute_bytes: [u8; 4] = unsafe { mem::transmute(absolute_time.to_be()) };
+            let absolute_bytes: [u8; 4] = absolute_time.to_be_bytes();
             let zero_time = absolute_time ^ current_time; // a-b%2
-            let zero_bytes: [u8; 4] = unsafe { mem::transmute(zero_time.to_be()) };
+            let zero_bytes: [u8; 4] = zero_time.to_be_bytes();
             match zero_bytes {
                 [0, 0, 0, 0] => Err(TimerError::Expired(e)),
                 [0, 0, 0, _] => {
@@ -328,9 +328,9 @@ where
     /// No timers will be executed for the skipped time.
     /// Only use this after determining that it's actually
     /// valid with [can_skip](QuadWheelWithOverflow::can_skip)!
-    pub fn skip(&mut self, amount: u32) -> () {
+    pub fn skip(&mut self, amount: u32) {
         let new_time = self.current_time_in_cycle().wrapping_add(amount);
-        let new_time_bytes: [u8; 4] = unsafe { mem::transmute(new_time.to_be()) };
+        let new_time_bytes: [u8; 4] = new_time.to_be_bytes();
         self.primary.advance(new_time_bytes[3]);
         self.secondary.advance(new_time_bytes[2]);
         self.tertiary.advance(new_time_bytes[1]);

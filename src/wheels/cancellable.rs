@@ -191,13 +191,22 @@ where
     /// No timers will be executed for the skipped time.
     /// Only use this after determining that it's actually
     /// valid with [can_skip](QuadWheelWithOverflow::can_skip)!
-    pub fn skip(&mut self, amount: u32) -> () {
+    pub fn skip(&mut self, amount: u32) {
         self.wheel.skip(amount);
     }
 
     /// Determine if and how many ticks can be skipped
     pub fn can_skip(&self) -> Skip {
         self.wheel.can_skip()
+    }
+}
+
+impl<EntryType> Default for QuadWheelWithOverflow<EntryType>
+where
+    EntryType: CancellableTimerEntry,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 

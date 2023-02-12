@@ -154,6 +154,7 @@ where
     }
 
     /// Advance the virtual time
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> SimulationStep {
         loop {
             match self.timer.can_skip() {
@@ -184,18 +185,28 @@ where
         }
     }
 
-    fn trigger_entry(&mut self, e: Rc<SimulationEntry<I, O, P>>) -> () {
-        match SimulationEntry::execute_unique_ref(e) {
-            Some((new_e, delay)) => match self.timer.insert_ref_with_delay(new_e, delay) {
+    fn trigger_entry(&mut self, e: Rc<SimulationEntry<I, O, P>>) {
+        if let Some((new_e, delay)) = SimulationEntry::execute_unique_ref(e) {
+            match self.timer.insert_ref_with_delay(new_e, delay) {
                 Ok(_) => (), // ok
                 Err(TimerError::Expired(e)) => panic!(
                     "Trying to insert periodic timer entry with 0ms period! {:?}",
                     e
                 ),
                 Err(f) => panic!("Could not insert timer entry! {:?}", f),
-            },
-            None => (), // ok, timer is not rescheduled
-        }
+            }
+        } // otherwise, timer is not rescheduled
+    }
+}
+
+impl<I, O, P> Default for SimulationTimer<I, O, P>
+where
+    I: Hash + Clone + Eq + Debug,
+    O: OneshotState<Id = I> + Debug,
+    P: PeriodicState<Id = I> + Debug,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -241,13 +252,13 @@ where
     type OneshotState = O;
     type PeriodicState = P;
 
-    fn schedule_once(&mut self, timeout: Duration, state: Self::OneshotState) -> () {
+    fn schedule_once(&mut self, timeout: Duration, state: Self::OneshotState) {
         let e = SimulationEntry::OneShot { state };
         match self.timer.insert_ref_with_delay(Rc::new(e), timeout) {
             Ok(_) => (), // ok
             Err(TimerError::Expired(e)) => {
-                if let None = SimulationEntry::execute_unique_ref(e) {
-                    ()
+                if SimulationEntry::execute_unique_ref(e).is_none() {
+                    // do nothing
                 } else {
                     // clearly a OneShot
                     unreachable!("OneShot produced reschedule!")
@@ -257,31 +268,27 @@ where
         }
     }
 
-    fn schedule_periodic(
-        &mut self,
-        delay: Duration,
-        period: Duration,
-        state: Self::PeriodicState,
-    ) -> () {
+    fn schedule_periodic(&mut self, delay: Duration, period: Duration, state: Self::PeriodicState) {
         let e = SimulationEntry::Periodic { period, state };
         match self.timer.insert_ref_with_delay(Rc::new(e), delay) {
             Ok(_) => (), // ok
-            Err(TimerError::Expired(e)) => match SimulationEntry::execute_unique_ref(e) {
-                Some((new_e, delay)) => match self.timer.insert_ref_with_delay(new_e, delay) {
-                    Ok(_) => (), // ok
-                    Err(TimerError::Expired(e)) => panic!(
-                        "Trying to insert periodic timer entry with 0ms period! {:?}",
-                        e
-                    ),
-                    Err(f) => panic!("Could not insert timer entry! {:?}", f),
-                },
-                None => (), // ok, timer decided not to reschedule itself
-            },
+            Err(TimerError::Expired(e)) => {
+                if let Some((new_e, delay)) = SimulationEntry::execute_unique_ref(e) {
+                    match self.timer.insert_ref_with_delay(new_e, delay) {
+                        Ok(_) => (), // ok
+                        Err(TimerError::Expired(e)) => panic!(
+                            "Trying to insert periodic timer entry with 0ms period! {:?}",
+                            e
+                        ),
+                        Err(f) => panic!("Could not insert timer entry! {:?}", f),
+                    }
+                }
+            } // otherwise, timer decided not to reschedule itself
             Err(f) => panic!("Could not insert timer entry! {:?}", f),
         }
     }
 
-    fn cancel(&mut self, id: &Self::Id) -> () {
+    fn cancel(&mut self, id: &Self::Id) {
         match self.timer.cancel(id) {
             Ok(_) => (),                                                             // great
             Err(f) => eprintln!("Could not cancel timer with id={:?}. {:?}", id, f), // not so great, but meh

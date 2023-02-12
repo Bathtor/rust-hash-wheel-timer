@@ -60,12 +60,12 @@ impl<EntryType, RestType> ByteWheel<EntryType, RestType> {
     /// Advances the wheel pointer to the target index without executing anything
     ///
     /// Used for implementing "skip"-behaviours.
-    pub fn advance(&mut self, to: u8) -> () {
+    pub fn advance(&mut self, to: u8) {
         self.current = to;
     }
 
     /// Insert an entry at `pos` into the wheel and store the rest `r` with it
-    pub fn insert(&mut self, pos: u8, e: EntryType, r: RestType) -> () {
+    pub fn insert(&mut self, pos: u8, e: EntryType, r: RestType) {
         let index = pos as usize;
         let we = WheelEntry { entry: e, rest: r };
         if self.slots[index].is_none() {
@@ -93,5 +93,11 @@ impl<EntryType, RestType> ByteWheel<EntryType, RestType> {
             self.count -= l.len() as u64;
         }
         (cur, self.current)
+    }
+}
+
+impl<EntryType, RestType> Default for ByteWheel<EntryType, RestType> {
+    fn default() -> Self {
+        Self::new()
     }
 }
