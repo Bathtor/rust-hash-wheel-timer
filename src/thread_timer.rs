@@ -46,7 +46,7 @@ use super::*;
 use crate::wheels::{cancellable::*, *};
 use channel::select;
 use crossbeam_channel as channel;
-use std::{fmt, io, rc::Rc, thread, time::Instant};
+use std::{cmp::Ordering, fmt, io, rc::Rc, thread, time::Instant};
 
 #[derive(Debug)]
 enum TimerMsg<I, O, P>
@@ -85,19 +85,14 @@ where
     type OneshotState = O;
     type PeriodicState = P;
 
-    fn schedule_once(&mut self, timeout: Duration, state: Self::OneshotState) -> () {
+    fn schedule_once(&mut self, timeout: Duration, state: Self::OneshotState) {
         let e = TimerEntry::OneShot { timeout, state };
         self.work_queue
             .send(TimerMsg::Schedule(e))
             .unwrap_or_else(|e| eprintln!("Could not send Schedule msg: {:?}", e));
     }
 
-    fn schedule_periodic(
-        &mut self,
-        delay: Duration,
-        period: Duration,
-        state: Self::PeriodicState,
-    ) -> () {
+    fn schedule_periodic(&mut self, delay: Duration, period: Duration, state: Self::PeriodicState) {
         let e = TimerEntry::Periodic {
             delay,
             period,
@@ -108,7 +103,7 @@ where
             .unwrap_or_else(|e| eprintln!("Could not send Schedule msg: {:?}", e));
     }
 
-    fn cancel(&mut self, id: &Self::Id) -> () {
+    fn cancel(&mut self, id: &Self::Id) {
         self.work_queue
             .send(TimerMsg::Cancel(id.clone()))
             .unwrap_or_else(|e| eprintln!("Could not send Cancel msg: {:?}", e));
@@ -375,9 +370,8 @@ where
                             };
                             let elap = self.elapsed();
                             self.skip_and_tick(can_skip, elap);
-                            match res {
-                                Some(msg) => self.handle_msg(msg),
-                                None => (), // restart loop
+                            if let Some(msg) = res {
+                                self.handle_msg(msg)
                             }
                         }
                         Skip::Millis(can_skip) => {
@@ -395,21 +389,26 @@ where
     }
 
     #[inline(always)]
-    fn skip_and_tick(&mut self, can_skip: u32, elapsed: u128) -> () {
+    fn skip_and_tick(&mut self, can_skip: u32, elapsed: u128) {
         let can_skip_u128 = can_skip as u128;
-        if elapsed > can_skip_u128 {
-            // took longer to get rescheduled than we wanted
-            self.timer.skip(can_skip);
-            let ticks = elapsed - can_skip_u128;
-            for _ in 0..ticks {
-                self.tick();
+
+        match elapsed.cmp(&can_skip_u128) {
+            Ordering::Greater => {
+                // took longer to get rescheduled than we wanted
+                self.timer.skip(can_skip);
+                let ticks = elapsed - can_skip_u128;
+                for _ in 0..ticks {
+                    self.tick();
+                }
             }
-        } else if elapsed < can_skip_u128 {
-            // we got woken up early, no need to tick
-            self.timer.skip(elapsed as u32);
-        } else {
-            // elapsed == can_skip
-            self.timer.skip(can_skip);
+            Ordering::Less => {
+                // we got woken up early, no need to tick
+                self.timer.skip(elapsed as u32);
+            }
+            Ordering::Equal => {
+                // elapsed == can_skip
+                self.timer.skip(can_skip);
+            }
         }
     }
 
@@ -428,7 +427,7 @@ where
     }
 
     #[inline(always)]
-    fn handle_msg(&mut self, msg: TimerMsg<I, O, P>) -> () {
+    fn handle_msg(&mut self, msg: TimerMsg<I, O, P>) {
         match msg {
             TimerMsg::Stop => self.running = false,
             TimerMsg::Schedule(entry) => {
@@ -449,22 +448,21 @@ where
         }
     }
 
-    fn trigger_entry(&mut self, e: Rc<ThreadTimerEntry<I, O, P>>) -> () {
-        match ThreadTimerEntry::execute_unique_ref(e) {
-            Some((new_e, delay)) => match self.timer.insert_ref_with_delay(new_e, delay) {
+    fn trigger_entry(&mut self, e: Rc<ThreadTimerEntry<I, O, P>>) {
+        if let Some((new_e, delay)) = ThreadTimerEntry::execute_unique_ref(e) {
+            match self.timer.insert_ref_with_delay(new_e, delay) {
                 Ok(_) => (), // ok
                 Err(TimerError::Expired(e)) => panic!(
                     "Trying to insert periodic timer entry with 0ms period! {:?}",
                     e
                 ),
                 Err(f) => panic!("Could not insert timer entry! {:?}", f),
-            },
-            None => (), // ok, timer is not rescheduled
-        }
+            }
+        } // otherwise: timer is not rescheduled
     }
 
     #[inline(always)]
-    fn tick(&mut self) -> () {
+    fn tick(&mut self) {
         let res = self.timer.tick();
         for e in res {
             self.trigger_entry(e);
@@ -498,14 +496,18 @@ mod tests {
             timer.schedule_action_once(id, timeout, move |_| {
                 let elap = now.elapsed().as_nanos();
                 let target = timeout.as_nanos();
-                if elap > target {
-                    let diff = ((elap - target) as f64) / 1000000.0;
-                    println!("Running action {} {}ms late", i, diff);
-                } else if elap < target {
-                    let diff = ((target - elap) as f64) / 1000000.0;
-                    println!("Running action {} {}ms early", i, diff);
-                } else {
-                    println!("Running action {} exactly on time", i);
+                match elap.cmp(&target) {
+                    Ordering::Greater => {
+                        let diff = ((elap - target) as f64) / 1000000.0;
+                        println!("Running action {} {}ms late", i, diff);
+                    }
+                    Ordering::Less => {
+                        let diff = ((target - elap) as f64) / 1000000.0;
+                        println!("Running action {} {}ms early", i, diff);
+                    }
+                    Ordering::Equal => {
+                        println!("Running action {} exactly on time", i);
+                    }
                 }
                 let mut guard = barrier.lock().unwrap();
                 *guard = true;
@@ -519,7 +521,7 @@ mod tests {
         println!("Timing run done!");
         for b in barriers {
             let guard = b.lock().unwrap();
-            assert_eq!(*guard, true);
+            assert!(*guard);
         }
     }
 
@@ -558,7 +560,7 @@ mod tests {
         println!("Timing run done!");
         for b in barriers {
             let guard = b.lock().unwrap();
-            assert_eq!(*guard, true);
+            assert!(*guard);
         }
     }
 }
