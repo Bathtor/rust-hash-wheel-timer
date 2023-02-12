@@ -167,7 +167,7 @@ where
                     None => {
                         // Perhaps it was removed via cancel(), and the underlying
                         // Rc is still alive through some other reference
-                        return None
+                        return None;
                     }
                 }
                 Some(rc_e)

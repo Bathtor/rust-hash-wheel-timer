@@ -42,7 +42,8 @@ impl<EntryType, RestType> ByteWheel<EntryType, RestType> {
 
     /// Create a new empty ByteWheel
     pub fn new() -> Self {
-        let slots: [Option<WheelEntryList<EntryType, RestType>>; NUM_SLOTS] = [Self::INIT_VALUE; NUM_SLOTS];
+        let slots: [Option<WheelEntryList<EntryType, RestType>>; NUM_SLOTS] =
+            [Self::INIT_VALUE; NUM_SLOTS];
 
         ByteWheel {
             slots,
