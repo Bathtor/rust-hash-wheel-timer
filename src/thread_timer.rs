@@ -496,14 +496,18 @@ mod tests {
             timer.schedule_action_once(id, timeout, move |_| {
                 let elap = now.elapsed().as_nanos();
                 let target = timeout.as_nanos();
-                if elap > target {
-                    let diff = ((elap - target) as f64) / 1000000.0;
-                    println!("Running action {} {}ms late", i, diff);
-                } else if elap < target {
-                    let diff = ((target - elap) as f64) / 1000000.0;
-                    println!("Running action {} {}ms early", i, diff);
-                } else {
-                    println!("Running action {} exactly on time", i);
+                match elap.cmp(&target) {
+                    Ordering::Greater => {
+                        let diff = ((elap - target) as f64) / 1000000.0;
+                        println!("Running action {} {}ms late", i, diff);
+                    }
+                    Ordering::Less => {
+                        let diff = ((target - elap) as f64) / 1000000.0;
+                        println!("Running action {} {}ms early", i, diff);
+                    }
+                    Ordering::Equal => {
+                        println!("Running action {} exactly on time", i);
+                    }
                 }
                 let mut guard = barrier.lock().unwrap();
                 *guard = true;
@@ -517,7 +521,7 @@ mod tests {
         println!("Timing run done!");
         for b in barriers {
             let guard = b.lock().unwrap();
-            assert_eq!(*guard, true);
+            assert!(*guard);
         }
     }
 
@@ -556,7 +560,7 @@ mod tests {
         println!("Timing run done!");
         for b in barriers {
             let guard = b.lock().unwrap();
-            assert_eq!(*guard, true);
+            assert!(*guard);
         }
     }
 }

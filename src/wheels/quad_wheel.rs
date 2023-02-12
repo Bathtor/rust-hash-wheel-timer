@@ -431,10 +431,10 @@ mod uuid_tests {
     fn increasing_schedule_no_overflow() {
         let mut timer = QuadWheelWithOverflow::default();
         let mut ids: [Uuid; 25] = [Uuid::nil(); 25];
-        for i in 0..=24 {
+        for (i, slot) in ids.iter_mut().enumerate() {
             let timeout: u64 = 1 << i;
             let id = Uuid::new_v4();
-            ids[i] = id;
+            *slot = id;
             let entry = UuidOnlyTimerEntry {
                 id,
                 delay: Duration::from_millis(timeout),
@@ -442,7 +442,7 @@ mod uuid_tests {
             timer.insert(entry).expect("Could not insert timer entry!");
         }
         //let mut tick_counter = 0u128;
-        for i in 0..=24 {
+        for (i, slot) in ids.iter().enumerate() {
             let target: u64 = 1 << i;
             let prev: u64 = if i == 0 { 0 } else { 1 << (i - 1) };
             println!("target={} and prev={}", target, prev);
@@ -457,7 +457,7 @@ mod uuid_tests {
             //println!("Ticked to {}", tick_counter);
             assert_eq!(res.len(), 1);
             let entry = res.pop().unwrap();
-            assert_eq!(entry.id(), &ids[i]);
+            assert_eq!(entry.id(), slot);
         }
     }
 
@@ -465,10 +465,10 @@ mod uuid_tests {
     fn increasing_schedule_overflow() {
         let mut timer = QuadWheelWithOverflow::default();
         let mut ids: [Uuid; 33] = [Uuid::nil(); 33];
-        for i in 0..=32 {
+        for (i, slot) in ids.iter_mut().enumerate() {
             let timeout: u64 = 1 << i;
             let id = Uuid::new_v4();
-            ids[i] = id;
+            *slot = id;
             let entry = UuidOnlyTimerEntry {
                 id,
                 delay: Duration::from_millis(timeout),
@@ -476,7 +476,7 @@ mod uuid_tests {
             timer.insert(entry).expect("Could not insert timer entry!");
         }
         //let mut tick_counter = 0u128;
-        for i in 0..=32 {
+        for (i, slot) in ids.iter().enumerate() {
             let target: u64 = 1 << i;
             let prev: u64 = if i == 0 { 0 } else { 1 << (i - 1) };
             println!("target={} (2^{}) and prev={}", target, i, prev);
@@ -488,7 +488,7 @@ mod uuid_tests {
             //println!("In slot {} got {} expected {}", target, res.len(), 1);
             assert_eq!(res.len(), 1);
             let entry = res.pop().unwrap();
-            assert_eq!(entry.id(), &ids[i]);
+            assert_eq!(entry.id(), slot);
         }
     }
 
@@ -534,8 +534,8 @@ mod uuid_tests {
                 println!("Handled timeout {} at {}ms", index, millis);
                 index += 1usize;
             } else {
-                () // ignore empty ticks, which must be done do advance within a wheel
-                   //println!("Empty tick at {}ms", millis);
+                // ignore empty ticks, which must be done do advance within a wheel
+                //println!("Empty tick at {}ms", millis);
             }
         }
         assert_eq!(timer.can_skip(), Skip::Empty);
@@ -599,10 +599,10 @@ mod u64_tests {
     fn increasing_schedule_no_overflow() {
         let mut timer = QuadWheelWithOverflow::default();
         let mut ids: [u64; 25] = [0; 25];
-        for i in 0..=24 {
+        for (i, slot) in ids.iter_mut().enumerate() {
             let timeout: u64 = 1 << i;
             let id = i as u64;
-            ids[i] = id;
+            *slot = id;
             let entry = IdOnlyTimerEntry {
                 id,
                 delay: Duration::from_millis(timeout),
@@ -610,7 +610,7 @@ mod u64_tests {
             timer.insert(entry).expect("Could not insert timer entry!");
         }
         //let mut tick_counter = 0u128;
-        for i in 0..=24 {
+        for (i, slot) in ids.iter().enumerate() {
             let target: u64 = 1 << i;
             let prev: u64 = if i == 0 { 0 } else { 1 << (i - 1) };
             println!("target={} and prev={}", target, prev);
@@ -625,7 +625,7 @@ mod u64_tests {
             //println!("Ticked to {}", tick_counter);
             assert_eq!(res.len(), 1);
             let entry = res.pop().unwrap();
-            assert_eq!(entry.id(), &ids[i]);
+            assert_eq!(entry.id(), slot);
         }
     }
 
@@ -633,10 +633,10 @@ mod u64_tests {
     fn increasing_schedule_overflow() {
         let mut timer = QuadWheelWithOverflow::default();
         let mut ids: [u64; 33] = [0; 33];
-        for i in 0..=32 {
+        for (i, slot) in ids.iter_mut().enumerate() {
             let timeout: u64 = 1 << i;
             let id = i as u64;
-            ids[i] = id;
+            *slot = id;
             let entry = IdOnlyTimerEntry {
                 id,
                 delay: Duration::from_millis(timeout),
@@ -644,7 +644,7 @@ mod u64_tests {
             timer.insert(entry).expect("Could not insert timer entry!");
         }
         //let mut tick_counter = 0u128;
-        for i in 0..=32 {
+        for (i, slot) in ids.iter().enumerate() {
             let target: u64 = 1 << i;
             let prev: u64 = if i == 0 { 0 } else { 1 << (i - 1) };
             println!("target={} (2^{}) and prev={}", target, i, prev);
@@ -656,7 +656,7 @@ mod u64_tests {
             //println!("In slot {} got {} expected {}", target, res.len(), 1);
             assert_eq!(res.len(), 1);
             let entry = res.pop().unwrap();
-            assert_eq!(entry.id(), &ids[i]);
+            assert_eq!(entry.id(), slot);
         }
     }
 
@@ -702,8 +702,8 @@ mod u64_tests {
                 println!("Handled timeout {} at {}ms", index, millis);
                 index += 1usize;
             } else {
-                () // ignore empty ticks, which must be done do advance within a wheel
-                   //println!("Empty tick at {}ms", millis);
+                // ignore empty ticks, which must be done do advance within a wheel
+                //println!("Empty tick at {}ms", millis);
             }
         }
         assert_eq!(timer.can_skip(), Skip::Empty);

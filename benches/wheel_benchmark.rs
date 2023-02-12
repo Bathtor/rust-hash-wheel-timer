@@ -1,16 +1,5 @@
-use criterion::{
-    black_box,
-    criterion_group,
-    criterion_main,
-    BatchSize,
-    Bencher,
-    Criterion,
-    Throughput,
-};
-use hierarchical_hash_wheel_timer::{
-    wheels::{cancellable::*, *},
-    UuidOnlyTimerEntry,
-};
+use criterion::{criterion_group, criterion_main, BatchSize, Bencher, Criterion, Throughput};
+use hierarchical_hash_wheel_timer::{wheels::cancellable::*, UuidOnlyTimerEntry};
 use rand::prelude::*;
 use std::{rc::Rc, time::Duration};
 use uuid::Uuid;
@@ -33,7 +22,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
-fn write_only_dense_bench(bencher: &mut Bencher) -> () {
+fn write_only_dense_bench(bencher: &mut Bencher) {
     bencher.iter_batched(
         || {
             let timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
@@ -59,7 +48,7 @@ fn write_only_dense_bench(bencher: &mut Bencher) -> () {
     );
 }
 
-fn write_only_uniform_bench(bencher: &mut Bencher) -> () {
+fn write_only_uniform_bench(bencher: &mut Bencher) {
     bencher.iter_batched(
         || {
             let timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
@@ -91,7 +80,7 @@ fn write_only_uniform_bench(bencher: &mut Bencher) -> () {
     );
 }
 
-fn write_only_uniform_with_overflow_bench(bencher: &mut Bencher) -> () {
+fn write_only_uniform_with_overflow_bench(bencher: &mut Bencher) {
     bencher.iter_batched(
         || {
             let timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
@@ -123,7 +112,7 @@ fn write_only_uniform_with_overflow_bench(bencher: &mut Bencher) -> () {
     );
 }
 
-fn write_only_single_bench(bencher: &mut Bencher) -> () {
+fn write_only_single_bench(bencher: &mut Bencher) {
     bencher.iter_batched(
         || {
             let timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
@@ -149,7 +138,7 @@ fn write_only_single_bench(bencher: &mut Bencher) -> () {
     );
 }
 
-fn read_only_bench(bencher: &mut Bencher) -> () {
+fn read_only_bench(bencher: &mut Bencher) {
     bencher.iter_batched(
         || {
             let mut timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
@@ -167,8 +156,9 @@ fn read_only_bench(bencher: &mut Bencher) -> () {
             for _i in 1..=NUM_ELEMENTS {
                 let res = timer.tick();
                 for rc_e in res {
+                    #[allow(clippy::single_match)]
                     match Rc::try_unwrap(rc_e) {
-                        Ok(e) => drop(e),
+                        Ok(_e) => (), // drop(_e)
                         Err(_) => (),
                     }
                 }
@@ -179,7 +169,7 @@ fn read_only_bench(bencher: &mut Bencher) -> () {
     );
 }
 
-fn read_only_single_bench(bencher: &mut Bencher) -> () {
+fn read_only_single_bench(bencher: &mut Bencher) {
     bencher.iter_batched(
         || {
             let mut timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
@@ -196,8 +186,9 @@ fn read_only_single_bench(bencher: &mut Bencher) -> () {
         |mut timer| {
             let res = timer.tick();
             for rc_e in res {
+                #[allow(clippy::single_match)]
                 match Rc::try_unwrap(rc_e) {
-                    Ok(e) => drop(e),
+                    Ok(_e) => (), // drop(_e)
                     Err(_) => (),
                 }
             }
@@ -207,7 +198,7 @@ fn read_only_single_bench(bencher: &mut Bencher) -> () {
     );
 }
 
-fn read_write_bench(bencher: &mut Bencher) -> () {
+fn read_write_bench(bencher: &mut Bencher) {
     let id = Uuid::new_v4();
     let entry = UuidOnlyTimerEntry {
         id,

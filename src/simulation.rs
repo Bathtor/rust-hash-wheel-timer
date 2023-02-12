@@ -330,7 +330,7 @@ mod tests {
         println!("Simulation run done!");
         for b in barriers {
             let guard = b.lock().unwrap();
-            assert_eq!(*guard, true);
+            assert!(*guard);
         }
     }
 
@@ -367,7 +367,7 @@ mod tests {
         println!("Simulation run done!");
         for b in barriers {
             let guard = b.lock().unwrap();
-            assert_eq!(*guard, true);
+            assert!(*guard);
         }
     }
 }
