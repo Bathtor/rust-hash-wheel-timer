@@ -24,18 +24,6 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
           override: true
-      - name: Use the cache to share dependencies # keyed by Cargo.lock
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo2-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo2-
       - name: Checkout sources
         uses: actions/checkout@v2
       - name: Run tests
@@ -58,18 +46,6 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
           override: true
-      - name: Use the cache to share dependencies # keyed by Cargo.lock
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo2-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo2-
       - name: Checkout sources
         uses: actions/checkout@v2
       - name: Run tests
@@ -89,18 +65,6 @@ jobs:
           toolchain: nightly-2023-02-11
           override: true
           components: rustfmt, clippy
-      - name: Use the cache to share dependencies # keyed by Cargo.lock
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo2-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo2-
       - name: Checkout sources
         uses: actions/checkout@v2
       - name: Run cargo clippy (default)
@@ -130,18 +94,6 @@ jobs:
           toolchain: nightly-2023-02-11
           override: true
           components: rustfmt, clippy
-      - name: Use the cache to share dependencies # keyed by Cargo.lock
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo2-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo2-
       - name: Checkout sources
         uses: actions/checkout@v2
       - name: Run cargo fmt
