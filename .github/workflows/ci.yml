@@ -8,7 +8,7 @@ on:
       - master
     types: [opened, reopened, synchronize]
   schedule:
-    - cron: '0 0 * * *'  # every day at midnight
+    - cron: '@weekly'  # every day at midnight
 
 jobs:
   tests:
