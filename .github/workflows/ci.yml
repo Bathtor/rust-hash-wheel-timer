@@ -91,7 +91,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly-2023-02-11
+          toolchain: nightly-2024-09-25
           override: true
           components: rustfmt, clippy
       - name: Checkout sources
