@@ -166,7 +166,7 @@ where
             self.secondary.current(),
             self.primary.current(),
         ];
-        u32::from_be(unsafe { mem::transmute(time_bytes) })
+        u32::from_be_bytes(time_bytes)
     }
 
     /// Insert a new timeout into the wheel to be returned after `delay` ticks

@@ -9,7 +9,6 @@ use std::{
     mem,
     rc::{Rc, Weak},
     time::Duration,
-    u32,
 };
 
 pub mod byte_wheel;

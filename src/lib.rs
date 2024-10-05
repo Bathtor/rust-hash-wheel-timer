@@ -27,9 +27,9 @@
 //!
 //! - The [quad_wheel::QuadWheelWithOverflow](wheels::quad_wheel::QuadWheelWithOverflow) corresponds directly to the implementation described above.
 //! - The [cancellable::QuadWheelWithOverflow](wheels::cancellable::QuadWheelWithOverflow) additionally supports the cancellation of outstanding timers
-//! before they expire. In order to do so, however, it requires the generic timer entry type to provide a unique identifier field. It also uses
-//! [Rc](std::rc::Rc) internally to avoid double storing the actual entry, which makes it (potentialy) unsuitable for situations where the timer must
-//! be able to move threads (since Rc](std::rc::Rc) is not `Send`).
+//!   before they expire. In order to do so, however, it requires the generic timer entry type to provide a unique identifier field. It also uses
+//!   [Rc](std::rc::Rc) internally to avoid double storing the actual entry, which makes it (potentialy) unsuitable for situations where the timer must
+//!   be able to move threads (since Rc](std::rc::Rc) is not `Send`).
 //!
 //! # 3 – High Level APIs
 //! This crate also provides two high levels APIs that can either be used directly or can be seen as examples
