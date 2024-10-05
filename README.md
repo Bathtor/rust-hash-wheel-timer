@@ -29,7 +29,7 @@ This crate provides two variant implementations of this four level wheel structu
 ### 3 – High Level APIs
 This crate also provides two high levels APIs that can either be used directly or can be seen as examples of how to use the lower level APIs in an application.
 
-Bother higher level APIs also offer built-in support for periodically repeating timers, in addition to the normal timers which are scheduled once and discarded once expired.
+Both higher level APIs also offer built-in support for periodically repeating timers, in addition to the normal timers which are scheduled once and discarded once expired.
 
 #### Simulation Timer
 The `simulation` module provides an implementation for an event timer used to drive a discrete event simulation.
