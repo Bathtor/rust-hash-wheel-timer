@@ -65,7 +65,6 @@ where
 /// This is used to schedule events on the timer from other threads.
 ///
 /// You can get an instance via [timer_ref](TimerWithThread::timer_ref).
-#[derive(Clone)]
 pub struct TimerRef<I, O, P>
 where
     I: Hash + Clone + Eq,
@@ -109,7 +108,18 @@ where
             .unwrap_or_else(|e| eprintln!("Could not send Cancel msg: {:?}", e));
     }
 }
-
+impl<I, O, P> Clone for TimerRef<I, O, P>
+where
+    I: Hash + Clone + Eq,
+    O: OneshotState<Id = I>,
+    P: PeriodicState<Id = I>,
+{
+    fn clone(&self) -> Self {
+        Self {
+            work_queue: self.work_queue.clone(),
+        }
+    }
+}
 /// A timer implementation that uses its own thread
 ///
 /// This struct acts as a main handle for the timer and its thread.
@@ -562,5 +572,15 @@ mod tests {
             let guard = b.lock().unwrap();
             assert!(*guard);
         }
+    }
+
+    /// Check that the TimeRef is cloneable, even if its type parameters aren't.
+    #[test]
+    fn timer_ref_clone() {
+        let timer = TimerWithThread::for_uuid_closures();
+        let timer_ref: TimerRef<Uuid, OneShotClosureState<Uuid>, PeriodicClosureState<Uuid>> =
+            timer.timer_ref();
+        // No need to use it. Just checking that it compiles.
+        let _cloned_ref = timer_ref.clone();
     }
 }
