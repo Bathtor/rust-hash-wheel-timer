@@ -320,6 +320,15 @@ where
 }
 
 #[cfg(feature = "uuid-extras")]
+impl ManualTimer<uuid::Uuid, OneShotClosureState<uuid::Uuid>, PeriodicClosureState<uuid::Uuid>> {
+    /// Shorthand for creating a manual timer using `Uuid` identifiers and
+    /// closure state.
+    pub fn for_uuid_closures() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "uuid-extras")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -437,14 +446,5 @@ mod tests {
             "handler observed {observed_now:?}, which is earlier than scheduled lower bound {:?}",
             scheduled_from + delay
         );
-    }
-}
-
-#[cfg(feature = "uuid-extras")]
-impl ManualTimer<uuid::Uuid, OneShotClosureState<uuid::Uuid>, PeriodicClosureState<uuid::Uuid>> {
-    /// Shorthand for creating a manual timer using `Uuid` identifiers and
-    /// closure state.
-    pub fn for_uuid_closures() -> Self {
-        Self::new()
     }
 }
