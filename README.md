@@ -14,7 +14,7 @@ This crate provides a low-level event timer implementation based on hierarchical
 The APIs in the crate are offered at three different levels of abstraction, listed below from lowest to highest.
 
 ### 1 – Single Wheel
-The fundamental abstraction of this crate a single hash wheel with 256 slots addressed with a single byte. Each slot stores a list of a generic event type.
+The fundamental abstraction of this crate is a single hash wheel with 256 slots addressed with a single byte. Each slot stores a list of a generic event type.
 The whole wheel can be "ticked" causing entries in the slots that are being moved over to expire. With every tick, all expired event entries are returned for handling.
 
 ### 2 – Hierarchical Wheel
@@ -25,6 +25,8 @@ This crate provides two variant implementations of this four level wheel structu
 
 - The `wheels::quad_wheel::QuadWheelWithOverflow` corresponds directly to the implementation described above.
 - The `wheels::cancellable::QuadWheelWithOverflow` additionally supports the cancellation of outstanding timers before they expire. In order to do so, however, it requires the generic timer entry type to provide a unique identifier field. It also uses `std::rc::Rc` internally to avoid double storing the actual entry, which makes it (potentially) unsuitable for situations where the timer must be able to move between threads.
+
+For the cancellable wheel, exactly one of `fx-hash`, `fnv-hash`, or `sip-hash` must be enabled.
 
 ### 3 – High Level APIs
 This crate also provides three high-level APIs that can either be used directly or can be seen as examples of how to use the lower level APIs in an application.
@@ -44,7 +46,7 @@ The `manual_timer` module provides the same queue-based scheduling API as the th
 
 ## Documentation
 
-For reference and examples check the [API Docs](https://docs.rs/hierarchical_hash_wheel_timer).
+For reference and examples, check the [API docs](https://docs.rs/hierarchical_hash_wheel_timer).
 
 ## Performance
 
@@ -54,6 +56,6 @@ You can repeat these experiments on your own hardware by checking out the source
 
 ## License
 
-Licensed under the terms of MIT license.
+Licensed under the terms of the MIT licence.
 
 See [LICENSE](LICENSE) for details.

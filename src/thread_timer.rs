@@ -1,7 +1,7 @@
 //! This module provides a timer for real-time event schedulling with millisecond accuracy.
 //!
 //! It runs on its own dedicated thread and uses a shareable handle called a `TimerRef` for communication with other threads.
-//! This inter-thread communication is based on [crossbeam_channel](crossbeam_channel).
+//! This inter-thread communication is based on [crossbeam_channel].
 //!
 //! ## Note
 //! Sine this timer runs on its own thread, instance creation will fail if the generic id or state types used are not `Send`.

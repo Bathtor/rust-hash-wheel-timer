@@ -6,7 +6,7 @@ use uuid::Uuid;
 pub type UuidOnlyTimerEntry = IdOnlyTimerEntry<Uuid>;
 
 impl UuidOnlyTimerEntry {
-    /// Produce an entry with a random [Uuid](uuid::Uuid) and the given `delay`
+    /// Produce an entry with a random [Uuid] and the given `delay`
     ///
     /// Uses `Uuid::new_v4()` internally.
     pub fn with_random_id(delay: Duration) -> Self {

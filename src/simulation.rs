@@ -4,7 +4,7 @@
 //! but rather provides the rate at which the simulation proceeds.
 //!
 //! Progress in the simulation is driven by repeatedly calling the [next](SimulationTimer::next) function
-//! until it returns [SimulationStep::Finished](SimulationStep::Finished) indicating that the timer is empty
+//! until it returns [SimulationStep::Finished] indicating that the timer is empty
 //! and thus the simulation has run to completion.
 //!
 //! # Example

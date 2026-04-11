@@ -3,7 +3,8 @@ name = "hierarchical_hash_wheel_timer"
 version = "1.3.0"
 authors = ["Lars Kroll <bathtor@googlemail.com>"]
 edition = "2021"
-description = "A low-level timer implementantion using a hierarchical four-level hash wheel with overflow."
+rust-version = "1.94.1"
+description = "A low-level timer implementation using a hierarchical four-level hash wheel with overflow."
 documentation = "https://docs.rs/hierarchical_hash_wheel_timer"
 homepage = "https://github.com/Bathtor/rust-hash-wheel-timer"
 repository = "https://github.com/Bathtor/rust-hash-wheel-timer"
@@ -16,7 +17,7 @@ license = "MIT"
 default = ["uuid-extras", "fx-hash", "thread-timer"]
 uuid-extras = ["uuid"]
 thread-timer = ["crossbeam-channel"]
-# The following three features are mutually exclusive and you have to pick exactly one of them!
+# The following three features are mutually exclusive and you have to pick exactly one of them.
 
 # Use Rust's default Sip Hasher for cancellable timers
 sip-hash = []

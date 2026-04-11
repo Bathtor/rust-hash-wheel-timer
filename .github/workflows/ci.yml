@@ -32,6 +32,33 @@ jobs:
           command: test
           args: --verbose
 
+  msrv:
+    name: MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Rust 1.94.1
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.94.1
+          override: true
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - name: Run tests (default features)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose
+      - name: Run tests (fnv)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --no-default-features --features fnv-hash,uuid-extras
+      - name: Run tests (sip)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --no-default-features --features sip-hash,uuid-extras
+
   no-default-feature-tests:
     runs-on: ${{ matrix.os }}
     strategy:

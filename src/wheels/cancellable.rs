@@ -1,20 +1,21 @@
 //! An implementation of a four-level hierarchical hash wheel with overflow
 //! that allows entries to be cancelled before they expire.
 //!
-//! The design reuses the normal [quad_wheel](crate::wheels::quad_wheel), but
+//! The design reuses the normal [quad_wheel], but
 //! adds an internal hash map to keep track of which timeouts are still valid.
 //! This allows for constant time cancellation of timer entries,
 //! but with lazy deallocation (garbage collection) as the wheel advances.
 //!
 //! Depending on your concrete application and identifier type different hashers may
-//! give you the best performance. By the default this crate will use the `FxHasher`
+//! give you the best performance. By default this crate will use the `FxHasher`
 //! from the [rustc-hash](https://crates.io/crates/rustc-hash) crate, which provides very
 //! fast performance for small ids such as `u64` or `Uuid`.
-//! If you require a different set of performance characteristics you can switch the implemantion
+//! If you require a different set of performance characteristics you can switch the implementation
 //! using the `fnv-hash` or `sip-hash` features when compiling this crate.
+//! Exactly one of `fx-hash`, `fnv-hash`, or `sip-hash` must be enabled.
 //!
 //! # Examples
-//! A very simple example of schedulling and then cancelling a single entry can be seen below.
+//! A very simple example of scheduling and then cancelling a single entry can be seen below.
 //! ```
 //! # use std::time::Duration;
 //! use hierarchical_hash_wheel_timer::*;
@@ -36,6 +37,20 @@
 //! More advanced examples can be found in the sources for the [SimulationTimer](crate::simulation::SimulationTimer)
 //! and the [TimerWithThread](crate::thread_timer::TimerWithThread).
 
+#[cfg(not(any(feature = "fnv-hash", feature = "fx-hash", feature = "sip-hash")))]
+compile_error!(
+    "The cancellable wheel requires exactly one of the `fx-hash`, `fnv-hash`, or `sip-hash` features."
+);
+
+#[cfg(any(
+    all(feature = "fnv-hash", feature = "fx-hash"),
+    all(feature = "fnv-hash", feature = "sip-hash"),
+    all(feature = "fx-hash", feature = "sip-hash"),
+))]
+compile_error!(
+    "The cancellable wheel requires exactly one of the `fx-hash`, `fnv-hash`, or `sip-hash` features."
+);
+
 use super::*;
 use crate::wheels::quad_wheel::{
     PruneDecision,
@@ -43,10 +58,17 @@ use crate::wheels::quad_wheel::{
 };
 #[cfg(feature = "fnv-hash")]
 use fnv::FnvHashMap;
-#[cfg(feature = "fx-hash")]
+#[cfg(all(not(feature = "fnv-hash"), feature = "fx-hash"))]
 use rustc_hash::FxHashMap;
-#[cfg(feature = "sip-hash")]
+#[cfg(all(not(feature = "fnv-hash"), not(feature = "fx-hash")))]
 use std::collections::HashMap;
+
+#[cfg(feature = "fnv-hash")]
+type TimerMap<K, V> = FnvHashMap<K, V>;
+#[cfg(all(not(feature = "fnv-hash"), feature = "fx-hash"))]
+type TimerMap<K, V> = FxHashMap<K, V>;
+#[cfg(all(not(feature = "fnv-hash"), not(feature = "fx-hash")))]
+type TimerMap<K, V> = HashMap<K, V>;
 
 /// A trait for timer entries that can be uniquely identified, so they can be cancelled
 pub trait CancellableTimerEntry: Debug {
@@ -57,7 +79,7 @@ pub trait CancellableTimerEntry: Debug {
     fn id(&self) -> &Self::Id;
 }
 
-/// A pruner implementation for [Weak](std::rc::Weak) references
+/// A pruner implementation for [Weak] references
 ///
 /// Keeps values that can still be upgraded.
 pub fn rc_prune<E>(e: &Weak<E>) -> PruneDecision {
@@ -80,12 +102,7 @@ where
     EntryType: CancellableTimerEntry,
 {
     wheel: BasicQuadWheelWithOverflow<Weak<EntryType>>,
-    #[cfg(feature = "fnv-hash")]
-    timers: FnvHashMap<EntryType::Id, Rc<EntryType>>,
-    #[cfg(feature = "sip-hash")]
-    timers: HashMap<EntryType::Id, Rc<EntryType>>,
-    #[cfg(feature = "fx-hash")]
-    timers: FxHashMap<EntryType::Id, Rc<EntryType>>,
+    timers: TimerMap<EntryType::Id, Rc<EntryType>>,
 }
 
 impl<EntryType> QuadWheelWithOverflow<EntryType>
@@ -118,12 +135,7 @@ where
     pub fn new() -> Self {
         QuadWheelWithOverflow {
             wheel: BasicQuadWheelWithOverflow::new(rc_prune::<EntryType>),
-            #[cfg(feature = "fnv-hash")]
-            timers: FnvHashMap::default(),
-            #[cfg(feature = "sip-hash")]
-            timers: HashMap::new(),
-            #[cfg(feature = "fx-hash")]
-            timers: FxHashMap::default(),
+            timers: TimerMap::default(),
         }
     }
 
