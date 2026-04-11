@@ -42,7 +42,6 @@
 //! ```
 
 use super::*;
-
 use crate::{
     queue_timer::{ClockRef, QueueTimerControl, QueueTimerCore, TimerMsg},
     wheels::Skip,
@@ -202,19 +201,25 @@ where
                 Ok(message) => self.apply_message(message),
                 Err(channel::TryRecvError::Empty) => match self.core.can_skip() {
                     Skip::None => {
-                        thread::yield_now();
+                        thread::yield_now(); // Try again after yielding for a bit.
                     }
-                    Skip::Empty => match self.core.recv() {
-                        Ok(message) => {
-                            self.reset();
-                            self.apply_message(message);
+                    Skip::Empty => {
+                        // Wait until something is scheduled.
+                        // Don't even need to bother skipping time in the wheel,
+                        // since all times in there are relative.
+                        match self.core.recv() {
+                            Ok(message) => {
+                                self.reset(); // Since we waited for an arbitrary time and taking a new timestamp incurs no error.
+                                self.apply_message(message);
+                            }
+                            Err(channel::RecvError) => {
+                                panic!("Timer work_queue unexpectedly shut down!")
+                            }
                         }
-                        Err(channel::RecvError) => {
-                            panic!("Timer work_queue unexpectedly shut down!")
-                        }
-                    },
+                    }
                     Skip::Millis(can_skip) if can_skip > 5 => {
-                        let waiting_time = can_skip - 5;
+                        // Wait until something is scheduled but max can_skip.
+                        let waiting_time = can_skip - 5; // Balance OS scheduler inaccuracy.
                         let timeout = Duration::from_millis(u64::from(waiting_time));
                         let result = select! {
                             recv(self.core.work_queue()) -> message => message.ok(),
@@ -245,6 +250,7 @@ where
 
         match elapsed.cmp(&can_skip_u128) {
             Ordering::Greater => {
+                // It took longer to get rescheduled than we wanted.
                 self.core.skip(can_skip);
                 let ticks = elapsed - can_skip_u128;
                 for _ in 0..ticks {
@@ -252,9 +258,11 @@ where
                 }
             }
             Ordering::Less => {
+                // We got woken up early, no need to tick.
                 self.core.skip(elapsed as u32);
             }
             Ordering::Equal => {
+                // elapsed == can_skip
                 self.core.skip(can_skip);
             }
         }
@@ -419,6 +427,7 @@ mod tests {
         let timer = TimerWithThread::for_uuid_closures();
         let timer_ref: TimerRef<Uuid, OneShotClosureState<Uuid>, PeriodicClosureState<Uuid>> =
             timer.timer_ref();
+        // No need to use it. Just checking that it compiles.
         let _cloned_ref = timer_ref.clone();
     }
 }

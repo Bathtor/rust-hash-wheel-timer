@@ -6,7 +6,6 @@
 //! [`ManualTimer::advance_to_next`].
 
 use super::*;
-
 use crate::{
     queue_timer::{ClockRef, QueueTimerControl, QueueTimerCore, TimerMsg, TimerRef},
     wheels::Skip,
@@ -84,11 +83,11 @@ where
         inner.advance_to_next()
     }
 
-    /// Returns the current manually-driven logical time.
+    /// Returns the elapsed logical time since this manual timer was created.
     ///
     /// This is rounded down to the manual timer's millisecond resolution so it
     /// agrees with the deadlines the wheel can actually execute.
-    pub fn current_time(&self) -> Duration {
+    pub fn elapsed(&self) -> Duration {
         Duration::from_millis(self.elapsed_millis.load(Ordering::Acquire))
     }
 
@@ -100,8 +99,9 @@ where
         !inner.running || inner.core.is_idle()
     }
 
-    /// Stops the timer so future advances no longer execute queued work.
-    pub fn shutdown(&self) {
+    /// Stops this shared manual timer so future advances no longer execute
+    /// queued work, even through other clones of the same timer handle.
+    pub fn stop(&self) {
         let mut inner = self.inner.lock().expect("manual timer mutex poisoned");
         inner.running = false;
     }
@@ -400,11 +400,11 @@ mod tests {
         let base = timer_ref.now();
 
         timer.advance_by(Duration::from_micros(999));
-        assert_eq!(timer.current_time(), Duration::ZERO);
+        assert_eq!(timer.elapsed(), Duration::ZERO);
         assert_eq!(timer_ref.now(), base);
 
         timer.advance_by(Duration::from_micros(1));
-        assert_eq!(timer.current_time(), Duration::from_millis(1));
+        assert_eq!(timer.elapsed(), Duration::from_millis(1));
         assert_eq!(
             timer_ref.now().duration_since(base),
             Duration::from_millis(1)
