@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Bencher, Criterion, Throughput};
 use hierarchical_hash_wheel_timer::{wheels::cancellable::*, UuidOnlyTimerEntry};
-use rand::prelude::*;
+use rand::{rngs::Xoshiro256PlusPlus, RngExt, SeedableRng};
 use std::{rc::Rc, time::Duration};
 use uuid::Uuid;
 
@@ -53,10 +53,10 @@ fn write_only_uniform_bench(bencher: &mut Bencher) {
         || {
             let timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
             let mut entries = Vec::with_capacity(NUM_ELEMENTS);
-            let mut rng = rand_xoshiro::Xoshiro256PlusPlus::seed_from_u64(42);
+            let mut rng = Xoshiro256PlusPlus::seed_from_u64(42);
             for _i in 1..=NUM_ELEMENTS {
                 let id = Uuid::new_v4();
-                let mut delay: u32 = rng.gen();
+                let mut delay: u32 = rng.random();
                 if delay == 0 {
                     // make sure the entry is actually inserted and not just returned immediately
                     delay = 1;
@@ -85,10 +85,10 @@ fn write_only_uniform_with_overflow_bench(bencher: &mut Bencher) {
         || {
             let timer: QuadWheelWithOverflow<UuidOnlyTimerEntry> = QuadWheelWithOverflow::new();
             let mut entries = Vec::with_capacity(NUM_ELEMENTS);
-            let mut rng = rand_xoshiro::Xoshiro256PlusPlus::seed_from_u64(42);
+            let mut rng = Xoshiro256PlusPlus::seed_from_u64(42);
             for _i in 1..=NUM_ELEMENTS {
                 let id = Uuid::new_v4();
-                let mut delay: u64 = rng.gen();
+                let mut delay: u64 = rng.random();
                 if delay == 0 {
                     // make sure the entry is actually inserted and not just returned immediately
                     delay = 1;
