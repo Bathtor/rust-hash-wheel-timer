@@ -87,7 +87,7 @@ impl PruneDecision {
 
 /// A simple pruner implementation that never drops any value
 ///
-/// This is the default pruner for the [QuadWheelWithOverflow](QuadWheelWithOverflow)
+/// This is the default pruner for the [QuadWheelWithOverflow]
 pub fn no_prune<E>(_e: &E) -> PruneDecision {
     PruneDecision::Keep
 }
