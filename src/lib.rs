@@ -32,11 +32,13 @@
 //!   be able to move threads (since Rc](std::rc::Rc) is not `Send`).
 //!
 //! # 3 – High Level APIs
-//! This crate also provides two high levels APIs that can either be used directly or can be seen as examples
-//! of how to use the lower level APIs in an application.
+//! This crate also provides three high-level APIs that can either be used
+//! directly or can be seen as examples of how to use the lower level APIs in
+//! an application.
 //!
-//! Bother higher level APIs also offer built-in support for periodically repeating timers, in addition to the normal timers
-//! which are schedulled once and discarded once expired.
+//! All higher-level APIs also offer built-in support for periodically
+//! repeating timers, in addition to the normal timers which are scheduled once
+//! and discarded once expired.
 //!
 //! ## Simulation Timer
 //! The [simulation](simulation) module provides an implementation for an event timer used to drive a discrete event simulation.
@@ -46,6 +48,11 @@
 //! ## Thread Timer
 //! The [thread_timer](thread_timer) module provides a timer for real-time event schedulling with millisecond accuracy.
 //! It runs on its own dedicated thread and uses a shareable handle called a `TimerRef` for communication with other threads.
+//!
+//! ## Manual Timer
+//! The [manual_timer](manual_timer) module provides the same queue-based
+//! scheduling API as the thread timer, but advances only when the caller
+//! explicitly steps time forward.
 
 #![deny(missing_docs)]
 
@@ -58,6 +65,10 @@ use wheels::{cancellable::CancellableTimerEntry, TimerEntryWithDelay};
 mod timers;
 pub use self::timers::*;
 
+#[cfg(feature = "thread-timer")]
+pub mod manual_timer;
+#[cfg(feature = "thread-timer")]
+mod queue_timer;
 #[cfg(feature = "thread-timer")]
 pub mod thread_timer;
 

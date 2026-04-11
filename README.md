@@ -27,9 +27,9 @@ This crate provides two variant implementations of this four level wheel structu
 - The `wheels::cancellable::QuadWheelWithOverflow` additionally supports the cancellation of outstanding timers before they expire. In order to do so, however, it requires the generic timer entry type to provide a unique identifier field. It also uses `std::rc::Rc` internally to avoid double storing the actual entry, which makes it (potentially) unsuitable for situations where the timer must be able to move between threads.
 
 ### 3 – High Level APIs
-This crate also provides two high levels APIs that can either be used directly or can be seen as examples of how to use the lower level APIs in an application.
+This crate also provides three high-level APIs that can either be used directly or can be seen as examples of how to use the lower level APIs in an application.
 
-Both higher level APIs also offer built-in support for periodically repeating timers, in addition to the normal timers which are scheduled once and discarded once expired.
+All higher-level APIs also offer built-in support for periodically repeating timers, in addition to the normal timers which are scheduled once and discarded once expired.
 
 #### Simulation Timer
 The `simulation` module provides an implementation for an event timer used to drive a discrete event simulation.
@@ -38,6 +38,9 @@ Its particular feature is that it can skip quickly through periods where no even
 #### Thread Timer
 The `thread_timer` module provides a timer for real-time event scheduling with millisecond accuracy.
 It runs on its own dedicated thread and uses a shareable handle called a `TimerRef` for communication with other threads.
+
+#### Manual Timer
+The `manual_timer` module provides the same queue-based scheduling API as the thread timer, but advances only when the caller explicitly steps time forward.
 
 ## Documentation
 
